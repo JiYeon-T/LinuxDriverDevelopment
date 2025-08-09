@@ -30,7 +30,7 @@ static void __iomem *GPIO1_GDIR;
 
 //LED设备结构体
 //通过一个结构体来保存设备的信息
-struct newchrled_dev{
+struct newchrled_dev {
     struct cdev c_dev;  //字符设备
     dev_t devid;        //设备号
     struct class *class;    //类这个结构体
@@ -46,7 +46,7 @@ struct newchrled_dev newchrled;
 void led_switch( u8 stat )
 {
     u32 val = 0;
-    if( stat == LEDON ){
+    if ( stat == LEDON ) {
         val = readl(GPIO1_DR);  //读取虚拟地址
         val &= ~(1 << 3);       
         writel( val, GPIO1_GDIR_BASE );
@@ -84,7 +84,7 @@ static int newchrled_release(struct inode *inode, struct file *filep)
     // dev->minor;
 
     return 0;
-} 
+}
 
 //write
 //应用程序写到驱动 -> HAL

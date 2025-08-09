@@ -1,0 +1,81 @@
+# 参考文档 代码目录下:<Documentation/kbuild/Kconfig-language.txt & Makefile.txt>
+
+
+# Linux 内核 Kconfig
+config RTC_DRV_S3C
+    tristate "Samsung S3C series SOC RTC"
+    depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5PC1XX
+    help
+        RTC(Realtime clock) for S3C24XX series chips.
+
+# Kconfig 语法介绍
+#(1)菜单入口:
+#配置类型:bool, tristate, string, hex, int
+#输入提示:
+# prompt <prompt> [if <expr>]
+#默认值:
+# default <expr> [if <expr>]
+#依赖关系:
+# 如果定义了多重依赖使用 && 或者 || 分割
+depends on <expr>
+requires <expr>
+#选择/反向依赖
+select <symbol> [if <expr>]
+#范围:
+range <symbol> <symbol> [if <expr>]
+#帮助
+#帮助信息靠文本缩进识别结束
+help
+---help---
+
+#(2)菜单结构
+#menu 和 endmenu 之前的选项都会成为子菜单
+menu
+config A
+    ...
+config B
+    ...
+endmenu
+#另一种方式是通过分析依赖关系生成菜单结构
+#comment 用来注释
+config MODULES
+    bool "Enable loadable module support"
+
+config MODVERSIONS
+    bool "Set information of all modules"
+    depends on  MODULES
+    #这里什么用途?
+    comment "module support disables"
+        depends on !MODULES
+#if...endif
+if $(CONFIG_MODVERSIONS)
+    config A
+        bool "Enable a"
+endif
+#选择群:choice...endchoice
+choice
+    depends on FB_S3C_VGA
+    prompt "Select VGA Resolution for S3C Framebuffer"
+    default FB_S3C_VGA_1024_768
+
+    config FB_S3C_VGA_1024_768
+        bool "1 1024*768@60Hz"
+        ---help---
+        TBA
+
+    config FB_S3C_VGA_640*480
+        bool "640*480@60Hz"
+        ---help---
+        TBA
+endchoice
+
+#(3)包含其他 Kconfig 文件
+source "xxx"
+
+config MODVERSIONS
+    bool "Module versiong support"
+    help
+        Usually, you have to use module compiled with your kernel.
+
+
+
