@@ -27,3 +27,8 @@ source /etc/profile
 - 测试交叉编译工具链
 ```shell
 arm-linux-gcc -v    
+
+
+#####　5.git clonet 命令
+git clone ssh://git@ssh.github.com:443/JiYeon-T/LinuxDriverDevelopment.git
+
