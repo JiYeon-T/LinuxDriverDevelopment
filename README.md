@@ -14,7 +14,11 @@ Date:2021.8.21
 # TODO:
 1. 虚拟内存
 
-## 2. Linux 内核源代码目录结构:
+##### 1. 目录:
+huaqingyuanjian:<Linux驱动开发详解>
+zhengdianyuanzi:<视频课程>
+
+##### 2. Linux 内核源代码目录结构:
 arch 
 
 ##### 3.设置环境变量
@@ -32,3 +36,7 @@ arm-linux-gcc -v
 #####　5.git clonet 命令
 git clone ssh://git@ssh.github.com:443/JiYeon-T/LinuxDriverDevelopment.git
 
+##### 6. GNU offcial website doc
+https://www.gnu.org/software/libc/manual/html_node/
+
+##### 7. 
