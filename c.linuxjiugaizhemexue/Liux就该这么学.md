@@ -119,6 +119,7 @@ APT 是Debian及Ubuntu等Linux发行版的默认软件包管理工具，用于�
 
 ```shell
 apt --help
+
 apt update # 更新软件包列表
 # update - update list of available packages
 apt install <package_name> # e.g. sudo apt install curl
@@ -132,6 +133,22 @@ apt install <package_name> # e.g. sudo apt install curl
 # upgrade - upgrade the system by installing/upgrading packages
 # full-upgrade - upgrade the system by removing/installing/upgrading packages
 # edit-sources - edit the source information file
+apt-key --help # apt-key - APT key management utility
+apt-key add
+apt-key exportall | more # display all key
+apt-key adv --help # advanced operation
+```
+
+- 解决 apt-get update GPG 秘钥问题导致失败问题
+
+```shell
+#W: GPG error: http://packages.ros.org/ros/ubuntu xenial InRelease: The following signatures were invalid: KEYEXPIRED 1622248854
+#W: The repository 'http://packages.ros.org/ros/ubuntu xenial InRelease' is not signed.
+#N: Data from such a repository can't be authenticated and is therefore potentially dangerous to use.
+#N: See apt-secure(8) manpage for repository creation and user configuration details.
+
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80  --refresh-keys
+sudo apt-get update
 ```
 
 
@@ -169,6 +186,21 @@ systemctl 管理服务的开机启动等
 #####  2.  shell 命令
 
 ###### 系统命令
+
+- man - manual
+
+```shell
+man man
+#命令使用提示
+Usage:
+ mount [-lhV] # 默认参数
+ mount -a [options] # [] - 可选参数
+ mount [options] [--source] <source> | [--target] <directory> # <> - 必选参数
+ mount [options] <source> <directory>
+ mount <operation> <mountpoint> [<target>]
+```
+
+
 
 - wget
 
@@ -501,6 +533,15 @@ pmap -x processname
 
 ```
 
+- ​       lsof - list open files
+
+列出打开该文件的进程信息
+
+```shell
+lsof --help
+lsof /dev/sda1
+```
+
 
 
 
@@ -581,6 +622,18 @@ diff -c test2.cpp test.cpp
 # -c, -C NUM, --context[=NUM]   output NUM (default 3) lines of copied context
 ```
 
+- tee - tee - read from standard input and write to standard output and files
+
+```shell
+tee --help
+```
+
+
+
+
+
+
+
 ---
 
 ###### 文件目录管理命令
@@ -633,6 +686,8 @@ rm --help
 - dd - 按照指定大小和个数的数据块来复制文件或转换文件
 
 /dev/zero - 这个文件不占用系统存储空间,却可以提供无穷无尽的数据
+
+/dev/null - 类似于回收站/垃圾桶
 
 ```shell
 dd --help
@@ -1629,18 +1684,18 @@ udev 设备管理器会自动把硬件设备管理起来,
 
 udev 设备管理器的服务会一直以守护进程 (/lib/systemd/systemd-udevd) 的形式存在来监听内核发出的信号来管理 `/dev`目录下的设备文件.Linux 系统中常见的硬件设备的文件名称如表所示:
 
-| 硬件设备                                                     | 文件名称             |
-| ------------------------------------------------------------ | -------------------- |
-| IDE 设备                                                     | /dev/hd[a-d]         |
-| SCSI/STAT/U盘/硬盘设备<br />a~p 代表 16块不同的硬盘,默认从 a 开始分配<br />硬盘的分区编号也有讲究:<br />主分区或者扩展分区从 1 开始, 到 4 结束<br />逻辑分区从编号 5 开始 | /dev/sd[a-p]         |
-|                                                              | /dev/fd[0-1]         |
-|                                                              | /dev/lp[0-15]        |
-|                                                              | /dev/cdrom           |
-|                                                              | /dev/mouse           |
-|                                                              | /dev/st0 或 /dev/ht0 |
-| TODO: 这都是什么设备                                         | /dev/vcs             |
-|                                                              | /dev/tty[0-100]      |
-|                                                              | /dev/ttyS[0-100]     |
+| 硬件设备                                                     | 文件名称                                          |
+| ------------------------------------------------------------ | ------------------------------------------------- |
+| IDE 设备                                                     | /dev/hd[a-d]                                      |
+| SCSI/STAT/U盘/硬盘设备<br />a~p 代表 16块不同的硬盘,默认从 a 开始分配<br />硬盘的分区编号也有讲究:<br />主分区或者扩展分区从 1 开始, 到 4 结束<br />逻辑分区从编号 5 开始 | /dev/sd[a-p]<br />sd - storage device，　存储设备 |
+|                                                              | /dev/fd[0-1]                                      |
+|                                                              | /dev/lp[0-15]                                     |
+|                                                              | /dev/cdrom                                        |
+|                                                              | /dev/mouse                                        |
+|                                                              | /dev/st0 或 /dev/ht0                              |
+| TODO: 这都是什么设备                                         | /dev/vcs                                          |
+|                                                              | /dev/tty[0-100]                                   |
+|                                                              | /dev/ttyS[0-100]                                  |
 
 硬盘设备:
 
@@ -1661,9 +1716,734 @@ brw-rw----  1 root disk      8,     6 10月 14  2025 sda6
 
 如果 4 个主分区无法满足需求, 则需要引入扩展分区, 主分区中的一个分区指向扩展分区(类似与指针), 扩展分区从 :`/dev/sda5` 开始.
 
+/dev/sda5 表示什么：
+
+1. /dev 表示硬件设备所在的目录
+2. ａ 表示系统中同类接口中第一个被识别到的设备
+3. 5 表示这个设备是一个逻辑分区
+
+- 查看系统当前所有分区,  /proc/partitions
+
+```shell
+qz@ubuntu:~/Desktop/Typora-linux-x64$  cat /proc/partitions 
+major minor  #blocks  name
+
+   8        0   41943040 sda
+   8        1   33555456 sda1
+   8        2          1 sda2
+   8        5    8385536 sda5
+   8       16   20971520 sdb
+   8       32   20971520 sdc
+   8       48   20971520 sdd
+   8       64   20971520 sde
+  11        0    1048575 sr0
+   9      127    4190208 md127
+```
+
+- blkid - locate/print block device attributes 检查设备的 UUID 或分区类型
+
+```shell
+sudo blkid /dev/sdb
+qz@ubuntu:~/Desktop/Typora-linux-x64$  sudo blkid /dev/sdc
+/dev/sdc: UUID="3b03fdfb-4527-447e-01c1-715946fb860f" UUID_SUB="67b5eec2-07f3-759b-0eaa-b29234afb140" LABEL="ubuntu:0" TYPE="linux_raid_member" # 虽然其他方法查不到挂载信息，但是这里可以看到是 linux raid member
+
+# fdisk
+qz@ubuntu:~/Desktop/Typora-linux-x64$  sudo fdisk -l /dev/sdc
+Disk /dev/sdc: 20 GiB, 21474836480 bytes, 41943040 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+```
 
 
 
+###### 挂载硬件设备
+
+分区 -》 格式化 -》 挂载
+
+**挂载——当用户需要使用硬盘/分区中的数据时，需要先将其与一个已存在的目录建立关联，这个关联的动作就是挂载**
+
+- mount
+
+```shell
+mount --help
+#  -a, --all               mount all filesystems mentioned in fstab， 自动检查 /etc/fstab 中有无疏漏被挂载的设备文件，如果有则自动进行挂载
+# -t, --types <list>      limit the set of filesystem types， 一般不需要使用 -t 参数来指定文件系统类型，linux 系统会自行判断
+
+mount /dev/sdb2 /backup # 将 /dev/sdb2 挂载到 /backup 目录，将硬件设备与目录进行关联
+umount /dev/sdb2 # 取消挂载，意味着不再使用硬件资源
+
+mount -lhV # 查看所有的文件系统挂载信息
+mount -lhV | grep /dev/sdb # 查看硬盘 /dev/sdb 是否被挂载，如果已经挂载情况下可以尝试 umount /挂载目录取消挂载，再尝试能否使用
+```
+
+- umount - 取消挂载
+
+TODO:
+
+ 为什么取消挂载后，挂载的目录仍然可以访问？？
+
+```shell
+umount /dev/sdb1
+```
+
+- /etc/fstab - 如果想让硬件设备和目录永久的自动关联，就必须把挂在信息按照指定的格式写入到 /etc/fstab 中
+
+"设备文件  挂载目录  格式类型  权限选项  是否备份  是否自检"
+
+字段说明：
+
+| 字段     | 意义                                                         |
+| -------- | ------------------------------------------------------------ |
+| 设备文件 | 一般为设备的路径+设备名称，也可以写唯一的识别码(UUID)        |
+| 挂载目录 | 指定要挂载到的目录，需在挂载前创建好                         |
+| 格式类型 | 指定文件系统的格式，如：Ext3, Ext4, XFS, SWAP, iso9660(此为光盘设备) |
+| 权限选项 | 若设置为 defaults, 则默认权限为 rw, suid, dev, exec, auto, nouser, async |
+| 是否备份 | 1-开机后使用 dnmp 进行磁盘备份                               |
+| 是否自检 | 1-开机后进行磁盘自检                                         |
+
+例如：
+
+```shell
+cat /etc/fstab
+# /etc/fstab: static file system information.
+#
+# Use 'blkid' to print the universally unique identifier for a
+# device; this may be used with UUID= as a more robust way to name devices
+# that works even if disks are added and removed. See fstab(5).
+#
+# <file system> <mount point>   <type>  <options>       <dump>  <pass>
+# / was on /dev/sda1 during installation
+UUID=790b89af-da4a-4a0a-8770-b7ba723d8732 /               ext4    errors=remount-ro 0       1
+# swap was on /dev/sda5 during installation
+UUID=835a0819-4fb4-46b0-9258-7576b18d16bc none            swap    sw              0       0
+/dev/fd0        /media/floppy0  auto    rw,user,noauto,exec,utf8 0       0
+```
+
+- 虚拟机添加硬盘设备
+
+使用虚拟机添加 “新硬盘” 后还是按照 “分区 -》 格式化 -》 挂载” 的操作使用磁盘
+
+- fdisk - 磁盘/硬盘分区管理（添加，删除，转换等操作）
+
+```shell
+fdisk /dev/sdb
+# fdisk 是一个交互式的命令, 交互命令作用：
+m - 查看全部可用的参数
+n - 添加新的分区
+d - 删除某个分区的信息
+l - 列出所有可用的分区类型
+t - 改变某个分区的类型
+p - 查看分区信息
+w - 保存并退出
+q - 不保存直接退出
+```
+
+- file - 查看文件类型
+
+```shell
+file --help
+file /dev/sdb1
+#qz@ubuntu:/dev$  file /dev/sdb1 
+#/dev/sdb1: block special (8/17)
+```
+
+- partprobe - inform the OS of partition table changes
+
+如果 fdisks 命令创建后分区没有生效(没有 /dev/sdb1 文件)的情况下，可以使用这个命令两次。如果仍然不行，重启电脑
+
+```shell
+partprobe
+```
+
+- mkfd 格式化文件系统
+
+```shell
+# 打印支持的文件系统类型
+qz@ubuntu:/dev$  mkfs
+mkfs          mkfs.cramfs   mkfs.ext3     mkfs.ext4dev  mkfs.minix    mkfs.ntfs     
+mkfs.bfs      mkfs.ext2     mkfs.ext4     mkfs.fat      mkfs.msdos    mkfs.vfat
+
+mkfs.xfs /dev/sdb1 # 格式化 XFS 文件系统
+# sudo apt install xfsprogs # 安装格式化 XFS 文件系统需要的工具
+
+mkdir /newFS
+mount /dev/sdb1 /newFS # 挂载硬盘到 /newFS 目录
+```
+
+- df -  (disk fiesystem) report file system disk space usage
+
+```shell
+df --help
+df -h # 查看挂载状态和硬盘使用量信息
+
+# TODO:
+# 为什么本地测试后没有 /dev/sdb1 硬盘信息？ 但是挂载的文件目录是可以使用的
+qz@ubuntu:/newFS$  df -h
+Filesystem      Size  Used Avail Use% Mounted on
+udev            3.9G     0  3.9G   0% /dev
+tmpfs           796M  9.4M  787M   2% /run
+/dev/sda1        32G   15G   16G  50% /      # 根目录挂载的是 /dev/sda1, 查看 /etc/fstab 文件，开机后自动挂载的
+tmpfs           3.9G   19M  3.9G   1% /dev/shm
+tmpfs           5.0M  4.0K  5.0M   1% /run/lock
+tmpfs           3.9G     0  3.9G   0% /sys/fs/cgroup
+tmpfs           796M   76K  796M   1% /run/user/1000
+```
+
+- du - estimate file space usage
+
+```shell
+du -sh /newFS
+# -h, --human-readable
+#  -s, --summarize
+```
+
+
+
+**如果要设置开机后自动挂载，就要将 /dev/sdb1 的挂载信息添加到 /etc/fstab 中**
+
+```shell
+# /etc/fstab: static file system information.
+#
+# Use 'blkid' to print the universally unique identifier for a
+# device; this may be used with UUID= as a more robust way to name devices
+# that works even if disks are added and removed. See fstab(5).
+#
+# <file system> <mount point>   <type>  <options>       <dump>  <pass>
+# / was on /dev/sda1 during installation
+UUID=790b89af-da4a-4a0a-8770-b7ba723d8732 /               ext4    errors=remount-ro 0       1
+# swap was on /dev/sda5 during installation
+UUID=835a0819-4fb4-46b0-9258-7576b18d16bc none            swap    sw              0       0
+/dev/fd0        /media/floppy0  auto    rw,user,noauto,exec,utf8 0       0
+# 增加新挂载的硬盘文件
+/def/sfb1       /newFS          xfs     defaults        0       0 
+```
+
+- 添加交换分区
+
+交换分区 ： 将硬盘中划分一定的空间，用于保存内存中的数据，以便有限的内存可以给更活跃的程序使用。本质是为了解决物理内存不够的问题。
+
+生产中：交换分区一般为物理内存大小的 1.5-2 倍
+
+```shell
+# 虚拟机默认没有交换分区
+qz@ubuntu:/newFS$  free 
+              total        used        free      shared  buff/cache   available
+Mem:        8144672     1427196     5503424       48872     1214052     6342076
+Swap:             0           0           0
+```
+
+这里进行创建交换分区实验：
+
+分区 -》 格式化 -》 挂载
+
+```shell
+#1. 创建分区
+fdisk /dev/sdb
+# 创建 SWAP 分区
+```
+
+- mkswap - 创建交换分区, 专用的格式化命令
+
+```shell
+qz@ubuntu:/newFS$  free -m
+              total        used        free      shared  buff/cache   available
+Mem:           7953        1409        5358          44        1185        6180
+Swap:             0           0           0
+
+mkswap /dev/sdb2
+swapon /dev/sdb2 # 将 swap 分区正式挂载到系统中
+
+qz@ubuntu:/newFS$  free -h
+              total        used        free      shared  buff/cache   available
+Mem:           7.8G        1.4G        5.2G         44M        1.2G        6.0G
+Swap:           17G          0B         17G
+```
+
+为了能够让交换分区重启后仍然生效，修改 /etc/fstab
+
+```shell
+#交换分区
+/dev/sdb2       swap            swap    defaults        0       0
+```
+
+###### 磁盘容量配额 
+
+Linux 是一个多用户，多任务的操作系统， 对某一个用户所能使用的最大磁盘容量进行限制
+
+- quota - display disk usage and limits
+
+```shell
+sudo apt-get install quota
+```
+
+- xfs_quota - 针对 xfs 文件系统来管理磁盘容量配额服务而设计的命令
+
+```shell
+man xfs_quota
+xfs_quota --help
+# -c 以参数的形式设置要执行的命令
+# -x 专家模式，让运维人员能够对 quota 服务进行更多复杂的配置，
+# 例如：使用 xfs_quota 设置用户 tom 对 /boot 目录的磁盘容量配额
+# 具体限制：硬盘使用量的软限制 3MB 以及硬限制 6MB
+# 创建文件数量的软限制 3 个以及硬限制 6 个
+xfs_quota -x -c 'limit bsoft=3m bhard=6m isoft=3 ihard=6 tom' /boot
+# TODO:
+# xfs_quota: cannot setup path for mount /newFS/: No such device or address
+xfs_quota -x -c report /boot
+```
+
+切换到用户 tom 后测试磁盘容量配额是否生效
+
+```shell
+su - tom
+dd if=/dev/zero of=/boot/tom bs=5M count=1 # 超过软限制，但仍然能用
+dd if=/dev/zero of=/boot/tom bs=8M count=1 # 超过硬限制，报错，无法使用
+```
+
+**TODO:**
+
+- edquota - 用户编辑用户的 quota 配额限制
+
+edquota 会调用 vi/vim 编辑器来让 root 管理员修改要限制的细节
+
+```shell
+-u 表示针对哪个用户进行限制
+-g 表示针对哪个用户组进行限制
+# 修改 tom 的硬限制， 5MB->8MB
+edquota -u tom
+Filesystem  blocks  soft hard inodes  soft   hard
+/dev/sda	6144 	3072 8192	1 		3		6
+
+su - tom
+# 分别测试写入 8M 以及 10M 文件， TODO:
+```
+
+###### 软/硬链接方式
+
+硬链接：可以将它理解为一个指向原始文件 inode 的指针，系统不为它分配单独的 inode 和文件。所以硬链接与原始文件实际上是同一个文件，只是名字不同。我们每添加一个硬链接，该节点的 inode 连接数就为 +1, 而且只有当 inode 的连接数为 0 时，该文件才会真正删除。换言之，即使删除原文件，链接文件仍然存在且可以正常访问。由于技术的局限性，硬链接不能跨分区对目录文件进行链接。
+
+软链接(符号链接)：仅仅包含所链接文件的路径名，因此可以跨文件系统进行链接。原始文件删除后，链接文件也失效，与 windows 中的快捷方式类似。
+
+- ln - make links between files
+
+```shell
+# -s 创建符号链接(软链接)，如果不带 -s 参数，则默认创建硬链接
+# -f 强制创建文件或目录的链接
+# -i 覆盖前先询问
+# -v 显示创建链接的过程
+
+# 创建后 ll 可以看到链接个数增加了，删除 raw.txt 后 hard_link.txt 仍然啊可以访问， 链接数 -1
+ln -P raw.txt hard_link.txt # 参数缺省值就是 -P，所以也可以不写
+# 创建软链接，删除 raw.txt 后， soft_link.txt 无法访问
+Ln -s raw.txt soft_link.txt # 软链接
+
+qz@ubuntu:/newFS$  ll
+total 12
+drwxr-xrwx  2 root root   65 10月 16 08:05 ./
+drwxr-xr-x 24 root root 4096 10月 15 17:42 ../
+-rw-rw-r--  2 qz   qz     20 10月 16 08:01 hard2.txt
+-rw-rw-r--  2 qz   qz     20 10月 16 08:01 hard_link.txt
+lrwxrwxrwx  1 qz   qz      7 10月 16 08:01 soft_link.txt -> raw.txt
+```
+
+
+
+#### ch7. 使用 RAID 与 LVM 磁盘阵列技术
+
+###### RAID
+
+Redundant Array of Independent Disks. 独立冗余磁盘阵列
+
+- RAID0
+
+- RAID1
+
+- RAID5
+- RAID10
+
+
+
+- mdadm - manage MD devices aka Linux Software RAID, 磁盘阵列管理
+
+服务配置文件 `/etc/mdadm/mdadm.conf`
+
+```shell
+sudo apt-get install mdadm
+# -a 检测设备名称， -a yes 表示自动创建设备文件
+# -n 指定设备数量， -n 4 代表使用 4 快硬盘来部署 RAID 磁盘阵列， 最后加上 4 块硬盘设备的名称
+# -l 制定 RAID 级别，-l 10 参数掉表 RAID10 方案
+# -C 创建一个 RAID 阵列卡， 参数为设备名称(阵列卡名称)，例如:/dev/md0
+# -v 显示过程
+# -f 模拟设备损坏
+# -r 删除设备
+# -Q 查看摘要信息
+# -D 查看详细信息
+# -S 停止 RAID 磁盘阵列
+# -x 备份盘数量， -x 1 一个备份盘
+```
+
+例如：
+
+```shell
+# step1:创建 /dev/md0 RAID 分区
+mdadm -Cv /dev/md0 -a yes -n 4 -l 10 /dev/sdb1 /dev/sdc /dev/sdd /dev/sde 
+# step2:格式化文件系统：将制作好的 RAID 磁盘阵列格式化为 ext4 格式
+mkfs.ext4 /dev/md0
+# step3:挂载文件系统
+mkdir /RAID
+mount /dev/md0 /RAID
+# 设置开机自动挂载 /etc/fstab
+# RAID
+/dev/md0	/RAID 	ext4	defaults 	0	0
+
+df -h
+qz@ubuntu:/$  df -h
+Filesystem      Size  Used Avail Use% Mounted on
+udev            3.9G     0  3.9G   0% /dev
+tmpfs           796M  9.4M  786M   2% /run
+/dev/sda1        32G   15G   16G  50% /
+tmpfs           3.9G   22M  3.9G   1% /dev/shm
+tmpfs           5.0M  4.0K  5.0M   1% /run/lock
+tmpfs           3.9G     0  3.9G   0% /sys/fs/cgroup
+tmpfs           796M   76K  796M   1% /run/user/1000
+/dev/md0        3.9G  8.0M  3.7G   1% /RAID
+
+# 查看挂载信息
+mdadm -D /dev/md0
+qz@ubuntu:/$  sudo mdadm -D /dev/md0 
+/dev/md0:
+        Version : 1.2
+  Creation Time : Thu Oct 16 17:24:12 2025
+     Raid Level : raid10
+     Array Size : 4190208 (4.00 GiB 4.29 GB)
+  Used Dev Size : 2095104 (2046.34 MiB 2145.39 MB)
+   Raid Devices : 4
+  Total Devices : 4
+    Persistence : Superblock is persistent
+
+    Update Time : Thu Oct 16 20:37:33 2025
+          State : clean 
+ Active Devices : 4
+Working Devices : 4
+ Failed Devices : 0
+  Spare Devices : 0
+
+         Layout : near=2
+     Chunk Size : 512K
+
+           Name : ubuntu:0  (local to host ubuntu)
+           UUID : 3b03fdfb:4527447e:01c17159:46fb860f
+         Events : 17
+
+    Number   Major   Minor   RaidDevice State
+       0       8       17        0      active sync set-A   /dev/sdb1
+       1       8       32        1      active sync set-B   /dev/sdc
+       2       8       48        2      active sync set-A   /dev/sdd
+       3       8       64        3      active sync set-B   /dev/sde
+```
+
+- 损坏磁盘阵列及修复
+
+```shell
+mdadm /dev/md0 -f  /dev/sdb1 # 模拟磁盘损坏
+# 当购买了新的硬盘替换后重新挂载即可
+umount /RAID
+mdadm /dev/md0 -a /dev/sdb
+# 查看信息
+mdadm -D /dev/md0
+```
+
+- 磁盘阵列 + 备份盘
+
+为了避免 RAID1 两块磁盘同时出现问题的情况，使用 RAID5
+
+```shell
+# 3个磁盘 + 一个备份盘
+mdadm -Cv /dev/md0 -n 3 -l 5 -x 1 /dev/sdb /dev/sdc /dev/sdd /dev/sde
+# 格式化文件系统
+mkfs.ext4 /dev/md0
+# 设置开机自动挂载
+echo "/dev/md0 /RAID ext4 defaults 0 0" >> /etc/fstab
+mkdir /RAID
+mount -a # 从 /etc/fstab 挂载所有磁盘
+```
+
+设置 sdb 损坏，会发现备份盘自动顶替上岗
+
+```shell
+mdadm /dev/md0 -f /dev/sdb # 设置 sdb 损坏
+mdadm -D /dev/md0
+```
+
+TODO:
+
+RAID 如何卸载？ 使用过 RAID 的磁盘无法进行其他操作。提示：“can't exclusively open /dev/xxx, mounted filesystem?”
+
+
+
+###### LVM
+
+Logical Volume Manager, 逻辑卷管理器
+
+部署好 RAID 磁盘阵列后再修改硬盘分区大小时，就不好修改了——LVM 可以对硬盘资源进行动态调整
+
+创建初衷是为了解决“硬盘设备创建分区后不易修改分区大小的缺陷”
+
+**逻辑卷：在硬盘分区和文件系统之间添加了一个逻辑层，它提供了一个抽象的卷组，可以把多块硬盘进行卷组合并。这样，用户不用关心物理硬盘设备底层的架构和布局，就可以实现对硬盘分区的动态调整**
+
+主要是为了满足动态扩容 / 缩容的需求。
+
+- 扩容
+- 精简缩容
+
+部署 LVM 时，需要逐个部署物理卷，卷组和逻辑卷。
+
+| 功能/命令 | 物理卷管理(Phyical Volume) | 卷组管理(Volume Group) | 逻辑卷管理(Logical Volume) |
+| --------- | -------------------------- | ---------------------- | -------------------------- |
+| 扫描      | pvscan                     | vgscan                 | lvscan                     |
+| 建立      | pvcreate                   | vgcreate               | lvcreate                   |
+| 显示      | pvdisplay                  | vgdisplay              | lvdisplay                  |
+| 删除      | pvremove                   | vgremove               | lvremove                   |
+| 扩展      |                            | vgextend               | lvextend                   |
+| 缩小      |                            | vgreduce               | lvreduce                   |
+
+例如：对两块硬盘进行卷组合并，将合并后的卷组分割出一个 150MB 的逻辑卷设备，最后进行格式化以及挂载使用
+
+```shell
+# step1:新添加的两块磁盘创建物理卷，支持 LVM
+pvcreate /dev/sdb /dev/sdc
+root@ubuntu:~#  pvcreate /dev/sdb /dev/sdc # 创建 LVM 物理卷
+  Physical volume "/dev/sdb" successfully created
+  Physical volume "/dev/sdc" successfully created
+pvdisplay # 查看物理卷信息
+root@ubuntu:~#  blkid /dev/sdb  # 获取磁盘设备信息以及属性
+/dev/sdb: UUID="uRPVuc-cGfl-Ej4k-PDyp-IFyN-DhG6-ebNt0U" TYPE="LVM2_member"
+# step2: 添加到 storage 卷组中
+vgcreate storage /dev/sdb /dev/sdc
+vgdisplay # 查看卷组信息
+# step3: 切割一个 150MB 的逻辑卷设备
+lvcreate -n vo -l 37 storage # -n|--name LogicalVolumeName
+lvdisplay
+# step4: 将生成的逻辑卷格式化
+mkfs.ext4 /dev/storage/vo
+# step5: 挂载文件系统
+mkdir /linuxprobe
+mount /dev/storage/vo /linuxprobe # 使用逻辑卷挂载
+df -h # 查看挂载信息，
+
+qz@ubuntu:/linuxprobe$  df -h
+Filesystem              Size  Used Avail Use% Mounted on
+udev                    3.9G     0  3.9G   0% /dev
+tmpfs                   796M  9.4M  787M   2% /run
+/dev/sda1                32G   15G   16G  50% /
+tmpfs                   3.9G   19M  3.9G   1% /dev/shm
+tmpfs                   5.0M  4.0K  5.0M   1% /run/lock
+tmpfs                   3.9G     0  3.9G   0% /sys/fs/cgroup
+tmpfs                   796M   60K  796M   1% /run/user/1000
+/dev/mapper/storage-vo  140M  1.6M  128M   2% /linuxprobe
+```
+
+切割逻辑卷有两种计量单位：
+
+1. 以容量为单位， 参数 -L, 例如： -L 150M 表示生成一个 150MB 的逻辑卷
+2. 以基本单位的个数为单位，每个基本单元大小 4MB，参数 -l，例如：-l 37 表示生成一个 37*4=148MB 的逻辑卷
+
+- 扩容逻辑卷
+
+**在执行扩容/缩容操作前，必须先取消挂载文件系统**
+
+**扩容操作，先扩容，然后检查文件完整性; 而缩容为了数据安全，需要先检查文件完整性，然后进行缩容操作。**
+
+```shell
+umount /linuxprobe # 卸载设备和挂载点的关联
+# step1: 逻辑卷扩容至 290MB
+lvextend -L 290M /dev/storage/vo
+lvdisplay # 查看逻辑卷信息
+# step2: 检查硬盘完整性，并重置硬盘容量
+e2fsck -f /dev/storage/to
+resize2fs /dev/storage/to
+# step3:重新挂在硬盘设备并查看挂载状态
+mount /dev/storage/vo /linuxprobe
+df -h
+
+root@ubuntu:~#  df -h
+Filesystem              Size  Used Avail Use% Mounted on
+udev                    3.9G     0  3.9G   0% /dev
+tmpfs                   796M  9.4M  787M   2% /run
+/dev/sda1                32G   15G   16G  50% /
+tmpfs                   3.9G   19M  3.9G   1% /dev/shm
+tmpfs                   5.0M  4.0K  5.0M   1% /run/lock
+tmpfs                   3.9G     0  3.9G   0% /sys/fs/cgroup
+tmpfs                   796M   64K  796M   1% /run/user/1000
+/dev/mapper/storage-vo  279M  2.1M  259M   1% /linuxprobe
+```
+
+- 缩小逻辑卷
+
+```shell
+umount /linuxprobe
+# step1:检查文件系统的完整性并缩容
+e2fsck -f /dev/storage/vo
+# step2: 把逻辑卷 /dev/storage/vo 缩容到 120MB
+resize2fs /dev/storage/vo 120M
+lvreduce -L 120M /dev/storage/vo
+lvdispaly
+# step3:重新挂载文件系统并查看
+mount /dev/storage/vo /linuxprobe
+df -h
+
+root@ubuntu:~# df -h
+Filesystem              Size  Used Avail Use% Mounted on
+udev                    3.9G     0  3.9G   0% /dev
+tmpfs                   796M  9.4M  787M   2% /run
+/dev/sda1                32G   15G   16G  50% /
+tmpfs                   3.9G   19M  3.9G   1% /dev/shm
+tmpfs                   5.0M  4.0K  5.0M   1% /run/lock
+tmpfs                   3.9G     0  3.9G   0% /sys/fs/cgroup
+tmpfs                   796M   68K  796M   1% /run/user/1000
+/dev/mapper/storage-vo  113M  1.6M  103M   2% /linuxprobe
+```
+
+
+
+- e2fsck -  check a Linux ext2/ext3/ext4 file system
+
+```shell
+# -f     Force checking even if the file system seems clean.
+# 
+```
+
+-  resize2fs - ext2/ext3/ext4 file system resizer
+
+```shell
+# The resize2fs program will resize ext2, ext3, or ext4 file systems.  It can be used to enlarge or shrink an
+# unmounted file system located on device.  If the filesystem is mounted, it can be used to expand  the  size
+# of  the  mounted  filesystem,  assuming  the kernel and the file system supports on-line resizing. 
+```
+
+- 逻辑卷快照 - 类似与虚拟机还原到某个时间点的功能
+
+如果日后发现数据被该错了，就可以利用之前的快照卷进行还原，LVM 的快照卷有两个特点：
+
+1. 快照卷的容量必须等于逻辑卷的容量
+2. 快照卷仅一次有效，一旦执行还原操作后则会自动删除
+
+```shell
+vgdisplay # 查看卷组信息
+# step1: 生成快照卷
+lvcreate -L 120M -s -n SNAP /dev/storage/vo # -s 生成快照卷; -L 指定切割大小; 
+root@ubuntu:~#   lvcreate -L 120M -s -n SNAP /dev/storage/vo
+  Logical volume "SNAP" created.
+# 在逻辑卷中创建一些垃圾文件
+dd if=/dev/zero of=/linuxprobe/files count=1 bs=100M
+lvdispaly 
+  --- Logical volume ---
+  LV Path                /dev/storage/SNAP
+  LV Name                SNAP
+  VG Name                storage
+  LV UUID                UxYDHM-SZ7Y-oCR8-bmMk-TmsH-CoKm-7haLuy
+  LV Write Access        read/write
+  LV Creation host, time ubuntu, 2025-10-17 11:46:24 +0800
+  LV snapshot status     active destination for vo
+  LV Status              available
+  # open                 0
+  LV Size                120.00 MiB
+  Current LE             30
+  COW-table size         120.00 MiB
+  COW-table LE           30
+  Allocated to snapshot  83.71% # 快照卷占的比例上升了
+  Snapshot chunk size    4.00 KiB
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     256
+  Block device           253:3
+#step3: 为了验证快照卷的效果，需要对逻辑卷进行快照还原操作,快照卷会被自动删除（并且前面创建的 100MB垃圾也被删除了）
+umount /linuxprobe # 还原前需要先取消挂载
+lvconvert --merge /dev/storage/SNAP
+#step4: 重新挂载
+mount  /dev/storage/vo /linuxprobe
+ls -l /linuxprobe
+```
+
+- 删除逻辑卷
+
+提前备份好重要的数据信息，依次删除逻辑卷 -> 卷组 -> 物理卷，这个顺序不可以颠倒
+
+```shell
+# 首先必须取消挂在
+umount /linuxprobe
+# step1:删除逻辑卷
+lvremove /dev/storage/vo
+lvdisplay
+# step2:删除 storage 卷组
+vgremove storage
+vgdispaly
+# step3:删除物理卷设备
+pvremove /dev/sdb /dev/sdc
+pvdispaly
+```
+
+
+
+
+
+
+
+
+
+
+
+#### ch8 iptables 与 firewalld 防火墙
+
+
+
+#### ch9 使用 ssh 服务管理远程主机
+
+
+
+#### ch10 使用 Apache 服务部署静态网页
+
+
+
+#### ch11 使用 vsftpd 服务传输文件
+
+
+
+#### ch12 使用 Samba 或 NFS 实现文件共享
+
+
+
+#### ch13 使用 BIND 提供域名解析服务
+
+
+
+#### ch14 使用 DHCP 动态管理主机地址
+
+
+
+#### ch15 使用 Postfix 与 Dovecot 部署邮件服务
+
+
+
+#### ch16 使用 Squid 部署代理缓存服务
+
+
+
+#### ch17 使用 iSCSI 服务部署网络存储
+
+
+
+#### ch18 使用 MariaDB 数据库管理系统
+
+
+
+#### ch19 使用 PXE + Kickstart 无人值守安装服务
+
+
+
+#### ch20 使用 LNMP 架构部署动态网站环境
 
 
 
@@ -1679,5 +2459,7 @@ awk # 也可以用于 shell 字符串操作
 
 
 
-- 还有一个命令,也是专門用于 命令结果判断的
+- sed
+
+  
 
