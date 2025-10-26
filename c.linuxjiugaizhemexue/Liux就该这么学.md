@@ -4,6 +4,10 @@
 
 写一个关闭笔记本 touchpad 的脚本,放到开机文件里/手动执行
 
+- openssl
+
+- tcpdump 抓包看下， FTP/TFTP 是明文传输, ssh 是加密传输
+
 
 
 
@@ -467,8 +471,8 @@ read -p "Pleaese enter:\n" SCORE # 输入保存到变量 SCORE 中
 
 ```shell
 id --help
-id -u
-# -u user
+id -u # -u user
+id -n
 ```
 
 - at - 周期性执行与 cron 类似
@@ -540,6 +544,20 @@ pmap -x processname
 ```shell
 lsof --help
 lsof /dev/sda1
+```
+
+- scp — secure copy (remote file copy program)
+
+TODO:
+
+```shell
+
+```
+
+- strace - trace system calls and signals， 可以查看这条 shell 命令都执行了哪些系统调用
+
+```shell
+strace ls
 ```
 
 
@@ -801,7 +819,31 @@ realpath test.txt
 echo $SHELL
 ```
 
+- db_load - Load data from standard input
 
+// TODO:
+
+明文信息不安全，因此需要使用 hash 算法将明文信息文件转换成数据库文件，并降低数据库文件的权限
+
+```shell
+apt-get install db-util
+
+root@ubuntu:/srv#  db_
+db_archive     db_deadlock    db_hotbackup   db_log_verify  db_recover     db_stat        db_verify
+db_checkpoint  db_dump        db_load        db_printlog    db_replicate   db_upgrade 
+
+db_load -T -t hash -f vuser.list vuser.db # 生成 hash 加密文件， vuser.db
+
+qz@ubuntu:/tmp$  file vuser.db 
+vuser.db: Berkeley DB (Hash, version 9, native byte-order)
+ 
+```
+
+
+
+
+
+---
 
 ###### 网络有关
 
@@ -2387,47 +2429,2494 @@ pvdispaly
 
 
 
-
-
-
-
-
-
-
-
 #### ch8 iptables 与 firewalld 防火墙
+
+准确说 iptables 与 firewalld 都不是防火墙，他们都是用来定义防火墙管理策略的工具。
+
+iptables 会将配置好的防火墙策略交由内核层面的 netfilter 网络过滤器来处理
+
+firewalld 则会把配置好的防火墙策略交由内核层面的 nftables 包过滤框架来处理;
+
+**Linux 上有多种防火墙管理工具，具体用什么工具按需即可。**
+
+
+
+###### iptables
+
+- 策略与规则链
+
+按照拦截位置不同进行分类：
+
+1. 在进行路由选择前处理包，PREROUTING
+2. 处理流入的数据包：INPUT
+3. 处理流出的数据包：OUTPUT
+4. 处理转发的数据包：FORWARD
+5. 在进行路由选择后处理包：POSTROUTING
+
+- 处理策略：
+
+ACCEPT：允许流量
+
+REJECT：拒绝流量，但回复
+
+DROP：拒绝流量，丢弃数据包，不回复对端任何消息
+
+LOG: 记录日志信息
+
+**防火墙：策略规则是按照从上到下的顺序匹配的，因此一定要把允许动作放到拒绝动作前面，否则所有的流量都会被拒绝掉，从而导致任何主机都无法访问我们的服务**
+
+- iptables/ip6tables — administration tool for IPv4/IPv6 packet filtering and NAT
+
+iptables 可以根据源地址，目的地址，传输协议，服务类型等信息进行匹配
+
+```shell
+-P 设置默认策略
+-F 清空规则链
+-L 查看规则链
+-A 在规则链末尾加入新规则
+-I num # 在规则链的头部加入新规则
+-D 删除某一条规则
+-s 匹配来源地址 IP/MASK,加 ! 表示逻辑非，除了这个 IP 外的所有 IP
+-d 匹配目标地址
+-i 网卡名称，# 匹配从这块网卡流入的数据
+-o 网卡名称 # 匹配从这个网卡流出的数据
+-p 匹配协议，如：TCP，UDP, ICMP
+--dport num # 匹配目标端口号
+--sport num # 匹配源端口号
+
+iptables -L # list
+iptables -F # clear
+iptables -P INPUT DROP # 设置输入默认策略为 DROP，当把默认策略修改为 堵时，就需要设置允许的条件了
+
+root@ubuntu:~#   iptables -L
+Chain INPUT (policy DROP) # policy DROP
+target     prot opt source               destination      
+
+iptables -I INPUT -p icmp -j ACCEPT # 向 ICMP 链中添加允许 ICMP 流入的策略
+
+iptables -D INPUT 1 # 删除规则链
+iptables -P INPUT ACCEPT # 设置默认策略为允许
+iptables -I INPUT -s 192.168.10.0/24 -p tcp --dport 22 -j ACCEPT # 将 INPUT 规则设置为仅允许指定网段访问本机的 22 端口，拒绝来自其他所有主机的流量
+iptables -A INPUT -p tcp --dport 22 -j REJECT # 拒绝来自其他所有主机的流量
+```
+
+ssh 测试：
+
+```shell
+ssh 192.168.10.10 # 服务器 ip, 输入对方主机 root 管理员密码后既可以登录
+```
+
+添加其他规则：
+
+```shell
+iptables -I INPUT -p tcp --dport 12345 -j REJECT # 向 INPUT 规则链中添加拒绝所有人访问 12345 端口的策略
+iptables -I INPUT -p udp --dport 12345 -j REJECT
+iptables -I INPUT -p tcp -s 192.168.10.5 --dport 80 -j REJECT # INPUT 中拒绝 192.168.10.5 访问 web 服务
+iptables -A INPUT -p tcp --dport 1000:1024 -j REJECT # 拒绝所有主机访问本机 1000-1024 端口
+```
+
+**iptables 命令配置的防火墙规则默认会在系统下一次重启时失效，如果想让配置的防火墙规则永久生效，还要执行保存命令**
+
+```shell
+service iptables save # NOTE:报错 unrecognized service
+# 配置文件保存目录:ubuntu/Debian /etc/iptables.rules; Redhat: /etc/sysconfig/iptables
+# sudo apt-get install iptables-persistent
+iptables-save # 仅仅是打印到 stdout ???
+# 保存：
+sudo iptables-save > /etc/iptables/rules.v4
+sudo ip6tables-save > /etc/iptables/rules.v6 # ipv6
+# 从配置文件恢复防火墙
+iptables-restore < /etc/iptables/rules.v4
+```
+
+
+
+###### firewalld
+
+RHEL7 系统中还集成了其他防火墙管理工具，firewalld 服务就是默认的防火墙管理工具，他支持 CLI(命令行界面) 和 GUI (图形用户界面) 两种方式。
+
+**firewalld 定义了一系列防火墙策略，通过区域进行区分。切换上网环境时，避免用户进行频繁操作，只需要切换区域即可。**
+
+区域名称以及策略规则：
+
+| 区域     | 默认策略规则                                                 |
+| -------- | ------------------------------------------------------------ |
+| trusted  | 允许所有的数据包                                             |
+| home     | 拒绝流入的流量，除非与流出流量有关<br />而如果流量与 ssh, mdns, ipp-client, amba-client, dhcpv6-client 服务有关，则允许流量 |
+| internal | 等同于 home 区域                                             |
+| work     | 拒绝流入的流量，除非与流出流量有关<br />而如果流量与 ssh, ipp-client, amba-client, dhcpv6-client 服务有关，则允许流量 |
+| public   | 拒绝流入的流量，除非与流出流量有关<br />而如果流量与 ssh, dhcpv6-client, ipp-client 有关，则允许流量 |
+| external | 拒绝流入的流量，除非与流出流量有关<br />而如果流量与 ssh 有关，则允许流量 |
+| dmz      | 拒绝流入的流量，除非与流出流量有关<br />而如果流量与 ssh, dhcpv6-client, ipp-client 有关，则允许流量 |
+| block    | 拒绝流入的流量，除非与流出流量有关<br />                     |
+| drop     | 拒绝流入的流量，除非与流出流量有关                           |
+
+- firewall-cmd - firewalld 的防火墙配置管理工具的 CLI(命令行界面)版本
+
+```shell
+sudo apt-get install firewalld
+# 参数说明：
+--get-default-zone # 查询默认的区域名称
+--set-default-zone=<区域名称> # 设置默认的区域，使其永久生效
+--get-zones # 显示可用的区域
+--get-services # 显示预定义的服务
+--get-active-zones # 显示当前正在使用的区域与网卡名名称
+--add-source= # 将源自此 IP 或子网的流量导向指定的区域
+--remove-source= # 不再将源自此 IP 的流量导向指定的区域
+--add-interface=<网卡名称> # 将源自该网卡的流量都导向某个指定的区域
+--change-interface=<网卡名称> # 将某个网卡与区域进行关联
+--list-all # 显示当前区域的网卡配置参数，资源，端口以及服务等信息
+--list-all-zones # 显示所有区域的网卡配置参数，资源，端口以及服务等信息
+--add-service=<服务名> # 设置默认区域允许该服务的流量
+--remove-service=<服务名> # 设置默认区域不再允许该服务的流量
+--add-port=<端口/协议号> # 设置默认区域允许该端口的流量
+--remove-port=<端口/协议号> # 设置默认区域不再允许该端口的流量
+--reload # 重新加载，即让永久生效的规则立即生效
+--panic-on # 开启紧急状况模式
+--panic-off # 关机紧急状况模式
+```
+
+**与 linux 系统中其他的防火墙策略配置工具一样，使用 firewalld 配置的防火墙策略默认为 runtime 模式，即当前生效模式，重启后会失效。**
+
+如果需要立即生效，则需要加上 `--permanent` 参数，使用永久模式（只有在系统重启之后才会自动生效，如果需要立即生效，需要`firewall-cmd --reload` 重新加载一下）。
+
+```shell
+firewall-cmd --get-default-zone # 获取默认区域
+firewall-cmd --get-zone-of-interface=ens33 # 获取网卡在 firewalld 服务中的区域
+firewall-cmd --permanent --zone=external --change-interface=ens33 # 修改 firewalld 服务中网卡的默认区域为 external, --permanent 重启后生效(永久生效模式)
+firewall-cmd --get-zone-of-interface=ens33 # public
+firewall-cmd --permanent --get-zone-of-interface=ens33 # external
+# 启动/关闭防火墙的紧急模式，阻断一切网络链接，（远程控制时慎用）
+firewall-cmd --panic-on
+firewall-cmd --panic-off
+# 查询 public 区域是否允许 SSH 和 HTTPS 的流量
+firewall-cmd --zone=public --query-service=ssh # yes
+firewall-cmd --zone=public --query-service=https # no
+# 把 firewalld 服务中请求 HTTPS 协议的流量设置为永久允许，并立即生效
+firewall-cmd --zone=public --add-service=https # 立即生效模式
+firewall-cmd --permanent --zone=public --add-service=https # 永久模式
+firewall-cmd --realod # 立即生效
+# 把 firewalld 服务中请求 HTTPS 协议的流量设置为永久允许，并立即生效
+firewall-cmd --permanent --zone=public --remove-service=http
+firewall-cmd --reload
+# 把在 firewalld 服务中访问 8080 和 8081 端口的流量策略设置为允许，
+firewall-cmd --zone=public --add-port=8080-8081/tcp
+firewall-cmd --zone=public --list-ports
+# 把访问本机 888 端口的流量转发到 22 端口，并长期有效
+firewall-cmd --permanent --zone=public --add-forward-port=port=888:proto=tcp:toport=22:toaddr=192.168.10.10
+firewall-cmd --reload
+# firewalld 中的富规则表示更细致，拒绝 182.168.10.0/24 网段的所有用户访问 SSH 服务（22端口）
+firewall-cmd --permanent --zone=public --add-rich-rule="rule family="ipv4" source address="192.168.10.0/24" service name="ssh" reject"
+firewall-cmd --reload
+```
+
+
+
+- firewall-config - 图形管理工具
+
+```shell
+sudo apt-get install firewall-config
+
+```
+
+- NAT(Network Address Transformation)
+
+一种为了解决 IP 地址匮乏而设计的技术，可以使得多个内网中的用户通过同一个 IP 访问 internet. 该技术使用十分广泛，比如：通过路由器访问外网，
+
+**使用 firewalld 可以很方便的实现 NAT 功能，使用 Iptables 却不好实现。**
+
+
+
+- firewalld 放行所有流量, TODO:
+
+```shell
+sudo firewall-cmd --permanent --zone=public --add-source=0.0.0.0/0 --add-masquerade
+sudo firewall-cmd --permanent --zone=public --change-interface=eth0 --add-source=0.0.0.0/0 --add-masquerade
+sudo firewall-cmd --permanent --zone=public --add-rich-rule='rule family="ipv4" source address="0.0.0.0/0" accept'
+sudo firewall-cmd --reload
+```
+
+这些命令会设置firewalld允许所有IPv4流量。
+
+用于测试，暂时关闭虚拟机上的防火墙
+
+```shell
+systemctl stop firewalld # 停止服务
+systemctl disable firewalld # 开机不启动
+```
+
+
+
+
+
+- Q&A
+
+1. 运行 apache httpd 服务程序后，虚拟机本机通过 `localhost:80` 可以打开默认主页 index.html，但是实体机(其他主机) 通过`172.20.10.2:80`无法打开该网页（可以 ping 通， 且主机 SSH 服务正常(对方可以通过 SSH 连接)），最终定位是防火墙问题，firewalld 仅打开了 https 的流量，没有打开 http. 解决：
+
+```shell
+firewall-cmd --permanent --add-service=http # 打开 http 的流量
+firewall-cmd --reload
+```
+
+
+
+
+
+
+
+###### TCP wrappers
+
+iptable & firewalld 都是基于 TCP/IP 协议的流量过滤工具，而 TCP Wrappers 则是能允许或禁止 Linux 提供服务的防火墙，从而在更好层面保护了 Linux 系统的安全运行。
+
+匹配规则：`/etc/hosts.allow` 然后 `/etc/hosts.deny` 如果都没有匹配到，则默认放行
+
+- 参数说明
+
+| 客户端类型                          | 例                         | 满足事例的客户端列表                     |
+| ----------------------------------- | -------------------------- | ---------------------------------------- |
+| 单一主机                            | 192.168.10.10              | IP 地址为 192.168.10.10 的主机           |
+| 指定网段                            | 192.168.10.                | IP 地址为 192.168.10.0/24 网段的所有主机 |
+| 指定网段<br />IP地址 + 子网掩码格式 | 192.168.10.0/255.255.255.0 | IP 地址为 192.168.10.0/24 网段的所有主机 |
+| 指定 DNS 后缀                       | .linuxprobe.com            | 所有 DNS 后缀为 .linuxprobe.com 的主机   |
+| 指定主机名称                        | www.linuxprobe.com         | 主机名称为 www.linuxprobe.com 的主机     |
+| 指定所有客户端                      | ALL                        | 所有主机全部包括在内                     |
+
+
+
+- 禁止访问 ssh 服务	
+
+```shell
+# /etc/hosts.deny
+sshd:*
+```
+
+- 允许 192.168.10.0/24 网段的主机访问 ssh 服务
+
+```shell
+# /etc/hosts.allow
+sshd:192.168.10.
+```
 
 
 
 #### ch9 使用 ssh 服务管理远程主机
 
+###### 配置网络服务
+
+
+
+- nmtui - nmtui - Text User Interface for controlling NetworkManager, CLI 界面
+
+配置网络参数：
+
+```shell
+nmtui
+```
+
+编辑网络配置文件，设置网卡为开机自启动：
+
+CentOS 为：/etc/sysconfig/network-scripts/ifcfg-eno1677736
+
+Ubuntu 为：/etc/network/interfaces
+
+```shell
+ONBOOT=yes
+# 修改配置文件后，重启相应的服务生效	
+systemctl restart networking # CentOS:systemctl restart network
+#或
+systemctl restart network-manager.service
+```
+
+
+
+- NetworkManager - 动态管理网络配置的守护进程，能够让网络设备保持链接状态，可使用 `nmcli`命令进行管理
+
+RHEL 和 CentOS 系统默认使用 NetworkManager 来提供网络服务。
+
+TODO:
+
+Networkmanager 也使用 Dbus 实现进程间通信。详细学习该模块
+
+
+
+- nmcli - command-line tool for controlling NetworkManager
+
+```shell
+nmcli --help
+nmcli -s connection # 查看网络状态
+```
+
+- 创建网络会话 - 类似与 firewalld 中的区域功能，不同的网络会话可以设置静态 IP 或者通过 DHCP 获取 IP 之类的
+
+例如：通过 `nmcli` 创建会话，
+
+```shell
+# company 在公司使用静态 IP，
+nmcli connection add con-name company ifname ens33 autoconnect no type ethernet ip4 192.168.175.10/24 gw4 192.168.0.1
+# home:在家中使用 DHCP 分配 IP，
+nmcli connection add con-name house type ethernet ifname ens33
+nmcli connection show # 显示所有的会话类型
+```
+
+**nmcli 配置过的网络会话是永久生效的，当切换不同的场景后，仅需要切换网络会话即可**
+
+```shell
+root@ubuntu:/#  nmcli connection up company 
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/1)
+root@ubuntu:/#  nmcli connection up house 
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/2)
+root@ubuntu:/#   nmcli connection up 'Wired connection 1'
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/3)
+# 删除 connection
+nmcli connection delete house
+```
+
+
+
+###### 绑定两块网卡
+
+TODO:
+
+1. ubuntu 上没有 /etc/sysconfig/network-scripts 配置文件
+
+https://www.cnblogs.com/zhoutuo/p/18609981
+
+2. 搞了两块网卡后 nmcli 异常，会话一直处于 connecting 状态， 
+
+```shell
+qz@ubuntu:~$  nmcli -p general 
+==============================================================
+                    NetworkManager status
+==============================================================
+STATE       CONNECTIVITY  WIFI-HW  WIFI     WWAN-HW  WWAN    
+--------------------------------------------------------------
+connecting  none          enabled  enabled  enabled  enabled 
+# nmcli connection up "Wifi "
+```
+
+3. 修改会话信息后可以 Up 起来但是仍然无法上网
+
+```shell
+qz@ubuntu:~$  nmcli connection show
+NAME     UUID                                  TYPE            DEVICE 
+ens33    d76ce20f-6ebe-42d9-abe4-11fb1bb86b2f  802-3-ethernet  ens33  
+company  4b3d9878-197b-41bb-b337-f80381d3accb  802-3-ethernet  -
+```
+
+
+
+
+
+###### 远程控制服务 — SSH
+
+Secure Shell
+
+远程管理 Linux 目前的首选方式，此前使用 FTP/telenet (使用明文传输，不安全)。
+
+登录方式：
+
+1. 基于口令验证-账户，密码;
+2. 基于密钥的验证-需要在本地生成密钥对，将公钥上传至服务器
+
+- SSH 服务的配置文件：`/etc/ssh/sshd_config`
+
+```shell
+man ssh_config
+
+ssh(1) obtains configuration data from the following sources in the following
+ order:
+
+       1.   command-line options
+       2.   user's configuration file (~/.ssh/config)
+       3.   system-wide configuration file (/etc/ssh/ssh_config)
+```
+
+- 关闭使用 root 登录 ssh 的权限，可以降低被黑客破解密码的几率
+
+```shell
+# vi /etc/ssh/sshd_config
+PermitRootLogin no # 不允许通过 root 用户登录
+PasswordAuthentication no # 不允许通过密码登录，仅允许通过验证密钥登录
+
+# 修改完配置文件以后需要手动重启 sshd 服务
+systemctl restart sshd
+systemctl enable sshd # 开机自启动 sshd 服务
+```
+
+**远程修改 sshd 配置文件后，重启 sshd 服务，远程的 ssh 绘画竟然不会关闭！！！**
+
+- 口令验证登录
+
+```shell
+# 客户端执行
+ssh 192.168.213.128
+# 输入帐号以及密码即可登录
+```
+
+- 安全密钥验证登录
+
+```shell
+ssh-keygen # 生成密钥对
+ssh-copy-id 192.168.10.10 # 将生成的密钥传送到远程主机
+ssh 192.168.10.10 # 登录
+```
+
+- scp - secure copy(remote file copy program)
+
+基于 SSH 在网络之间安全传输文件的命令
+
+```shell
+scp [-12346BCpqrTv] [-c cipher] [-F ssh_config] [-i identity_file] [-l limit]
+    [-o ssh_option] [-P port] [-S program] [[user@]host1:]file1 ...
+    [[user@]host2:]file2
+
+-v # 显示详细的进度
+-P # 指定远程主机的 scp 端口号
+-r # 递归传送，用于传送文件夹
+-6 # 使用 ipv6 协议
+
+scp /root/readme.txt 192.168.10.10:/home # 将文件上传到远程主机
+scp 192.168.10.20:/etc/redhat-release /root # 将远程主机上的文件下载到本地
+
+# 客户端也在本地主机上测试
+scp -v readme.txt qz@127.0.0.1:/home/qz
+root@ubuntu:/etc/ssh#  scp -v sshd_config qz@127.0.0.1:/home/qz
+Executing: program /usr/bin/ssh host 127.0.0.1, user qz, command scp -v -t /home/qz
+OpenSSH_7.2p2 Ubuntu-4ubuntu2.10, OpenSSL 1.0.2g  1 Mar 2016 # openssh
+debug1: Reading configuration data /etc/ssh/ssh_config
+debug1: /etc/ssh/ssh_config line 19: Applying options for *
+debug1: Connecting to 127.0.0.1 [127.0.0.1] port 22.
+debug1: Connection established.
+debug1: permanently_set_uid: 0/0
+debug1: key_load_public: No such file or directory
+debug1: identity file /root/.ssh/id_rsa type -1
+debug1: key_load_public: No such file or directory
+debug1: identity file /root/.ssh/id_rsa-cert type -1
+debug1: key_load_public: No such file or directory
+debug1: identity file /root/.ssh/id_dsa type -1
+debug1: key_load_public: No such file or directory
+debug1: identity file /root/.ssh/id_dsa-cert type -1
+debug1: key_load_public: No such file or directory
+debug1: identity file /root/.ssh/id_ecdsa type -1
+debug1: key_load_public: No such file or directory
+debug1: identity file /root/.ssh/id_ecdsa-cert type -1
+debug1: key_load_public: No such file or directory
+debug1: identity file /root/.ssh/id_ed25519 type -1
+debug1: key_load_public: No such file or directory
+debug1: identity file /root/.ssh/id_ed25519-cert type -1
+debug1: Enabling compatibility mode for protocol 2.0
+debug1: Local version string SSH-2.0-OpenSSH_7.2p2 Ubuntu-4ubuntu2.10
+debug1: Remote protocol version 2.0, remote software version OpenSSH_7.2p2 Ubuntu-4ubuntu2.10
+debug1: match: OpenSSH_7.2p2 Ubuntu-4ubuntu2.10 pat OpenSSH* compat 0x04000000
+debug1: Authenticating to 127.0.0.1:22 as 'qz'
+debug1: SSH2_MSG_KEXINIT sent
+debug1: SSH2_MSG_KEXINIT received
+debug1: kex: algorithm: curve25519-sha256@libssh.org
+debug1: kex: host key algorithm: ecdsa-sha2-nistp256
+debug1: kex: server->client cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none
+debug1: kex: client->server cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none
+debug1: expecting SSH2_MSG_KEX_ECDH_REPLY
+debug1: Server host key: ecdsa-sha2-nistp256 SHA256:w5f+e/rfj/2+xLQGvsF4WShB+Ue79S1XeRva0gS3nbE
+debug1: Host '127.0.0.1' is known and matches the ECDSA host key.
+debug1: Found key in /root/.ssh/known_hosts:4
+debug1: rekey after 134217728 blocks
+debug1: SSH2_MSG_NEWKEYS sent
+debug1: expecting SSH2_MSG_NEWKEYS
+debug1: SSH2_MSG_NEWKEYS received
+debug1: rekey after 134217728 blocks
+debug1: SSH2_MSG_EXT_INFO received
+debug1: kex_input_ext_info: server-sig-algs=<rsa-sha2-256,rsa-sha2-512>
+debug1: SSH2_MSG_SERVICE_ACCEPT received
+debug1: Authentications that can continue: publickey,password
+debug1: Next authentication method: publickey
+debug1: Trying private key: /root/.ssh/id_rsa
+debug1: Trying private key: /root/.ssh/id_dsa
+debug1: Trying private key: /root/.ssh/id_ecdsa
+debug1: Trying private key: /root/.ssh/id_ed25519
+debug1: Next authentication method: password
+qz@127.0.0.1's password: 
+debug1: Authentication succeeded (password).
+Authenticated to 127.0.0.1 ([127.0.0.1]:22).
+debug1: channel 0: new [client-session]
+debug1: Requesting no-more-sessions@openssh.com
+debug1: Entering interactive session.
+debug1: pledge: network
+debug1: client_input_global_request: rtype hostkeys-00@openssh.com want_reply 0
+debug1: Sending environment.
+debug1: Sending env LANG = en_US.UTF-8
+debug1: Sending command: scp -v -t /home/qz
+Sending file modes: C0644 2563 sshd_config
+Sink: C0644 2563 sshd_config
+sshd_config                                            100% 2563     2.5KB/s   00:00    
+debug1: client_input_channel_req: channel 0 rtype exit-status reply 0
+debug1: channel 0: free: client-session, nchannels 1
+debug1: fd 0 clearing O_NONBLOCK
+debug1: fd 1 clearing O_NONBLOCK
+Transferred: sent 4440, received 2580 bytes, in 0.6 seconds
+Bytes per second: sent 7341.3, received 4265.9
+debug1: Exit status 0
+
+```
+
+###### screen - 不间断会话服务, 
+
+screen - screen manager with VT100/ANSI terminal emulation
+
+正常情况下，通过远程进行操作的时候，如果由于网络等原因，远程关闭了，则服务端正在执行的操作也会停止。
+
+screen 是一款能够实现多窗口远程控制的开源服务程序，简单来说就是为了解决网络异常中断或者为了同时控制多个远程终端窗口而设计的。用户可以使用 screen 服务程序在多个会话间自由切换。主要功能：
+
+1. 会话恢复，即便网络中断，也可以让会话随时恢复，确保用户不会失去对远程的控制
+2. 多窗口：每个会话都是独立运行的，拥有各自独立的输入
+3. 会话共享，可以在其他用户之间共享
+
+默认是没有安装的，通过 apt 安装：
+
+```shell
+sudo apt-get install screen
+```
+
+通过 yum 本地磁盘安装：
+
+```shell
+mkdir -p /media/cdrom
+mount /dev/cdrom /media/cdrom
+# /etc/yum/repos.d/rhel7.repo, 配置 yum 软件源
+baseurl=file:///media/cdrom
+
+yum install screen
+```
+
+管理远程会话：
+
+```shell
+-d # 将指定的会话进行离线处理
+-r # 恢复指定会话
+-x # 一次性恢复所有会话
+-ls # 显示当前所有会话
+-wipe # 删除目前无法使用的会话
+
+screen -S backup # 创建一个名称为 backup 的会话窗口，
+screen -ls # 查看所有的会话窗口
+exit # 退出会话
+# 并不是每次都需要创建一个会话，
+# 直接使用 screen 命令执行要运行的命令，这样命令中的一切操作都被记录下来，当命令结束后会话自动结束
+screen vim readme.md 
+screen -r backup # 恢复会话1
+```
+
+- 会话共享功能
+
+```shell
+# A 终端创建会话，然后执行操作：
+screen -S cpuinfo # 创建 cpuinfo 会话
+top # 执行操作
+```
+
+B 终端，必须通过 SSH 登录：
+
+```shell
+ssh 192.168.0.2
+screen -x # 共享会话， B 终端同样可以看到 A 终端的内容
+```
+
+
+
+
+
+
+
 
 
 #### ch10 使用 Apache 服务部署静态网页
+
+常见的网页服务程序：
+
+IIS : Windows
+
+Nginx:
+
+Apache: CentOS: httpd； Ubuntu/Debian：  apache2
+
+```shell
+apt-get install apache2 # apache2
+```
+
+**NOTE: httpd 服务有关的配置测试， Ubuntu 和 CentOS 差距较大，如果确认要在 ubuntu 上使用 httpd 服务，这个服务有关的配置还需要再研究一下。功能都有，只不过配置选项的位置和 httpd 有区别**
+
+
+
+###### Apache httpd web 服务
+
+安装 apache web 服务
+
+CentOS 通过 yum 安装，需要配置本地软件源; ubuntu /Debian 通过 apt 安装
+
+```shell
+apt-get install httpd
+
+root@ubuntu:~# apt-get install httpd
+Reading package lists... Done
+Building dependency tree       
+Reading state information... Done
+Package httpd is a virtual package provided by:
+  nginx-light 1.10.3-0ubuntu0.16.04.5
+  nginx-full 1.10.3-0ubuntu0.16.04.5
+  nginx-extras 1.10.3-0ubuntu0.16.04.5
+  lighttpd 1.4.35-4ubuntu2.1
+  nginx-core 1.10.3-0ubuntu0.16.04.5
+  apache2 2.4.18-2ubuntu3.17
+  yaws 2.0.2-1
+  webfs 1.21+ds1-11
+  tntnet 2.2.1-2
+  ocsigenserver 2.6-1build2
+  mini-httpd 1.23-1
+  micro-httpd 20051212-15
+  ebhttpd 1:1.0.dfsg.1-4.3
+  aolserver4-daemon 4.5.1-18
+  aolserver4-core 4.5.1-18
+You should explicitly select one to install.
+```
+
+安装：
+
+```shell
+sudo apt-get install apache2
+systemctl start apache2
+systemctl status apache2
+```
+
+log 目录 `/var/log/apache2/error.log` 
+
+- 运行 apache2 web 服务(httpd)启动失败
+
+```shell
+root@ubuntu:~#   systemctl status apache2
+● apache2.service - LSB: Apache2 web server
+   Loaded: loaded (/etc/init.d/apache2; bad; vendor preset: enabled)
+  Drop-In: /lib/systemd/system/apache2.service.d
+           └─apache2-systemd.conf
+   Active: inactive (dead) since Sun 2025-10-19 07:44:33 CST; 7s ago
+     Docs: man:systemd-sysv-generator(8)
+  Process: 11300 ExecStop=/etc/init.d/apache2 stop (code=exited, status=0/SUCCESS)
+  Process: 11284 ExecStart=/etc/init.d/apache2 start (code=exited, status=0/SUCCESS)
+
+Oct 19 07:44:33 ubuntu apache2[11284]: (98)Address already in use: AH00072: make_sock: could not bind to addres # 无法 bind 该端口
+Oct 19 07:44:33 ubuntu apache2[11284]: (98)Address already in use: AH00072: make_sock: could not bind to addres
+Oct 19 07:44:33 ubuntu apache2[11284]: no listening sockets available, shutting down
+Oct 19 07:44:33 ubuntu apache2[11284]: AH00015: Unable to open logs
+Oct 19 07:44:33 ubuntu apache2[11284]: Action 'start' failed.
+Oct 19 07:44:33 ubuntu apache2[11284]: The Apache error log may have more information.
+Oct 19 07:44:33 ubuntu apache2[11284]:  *
+Oct 19 07:44:33 ubuntu apache2[11300]:  * Stopping Apache httpd web server apache2
+Oct 19 07:44:33 ubuntu apache2[11300]:  *
+Oct 19 07:44:33 ubuntu systemd[1]: Started LSB: Apache2 web server.
+```
+
+解决方法：
+
+```shell
+# 查看 apache2 服务器配置以及监听端口
+cat /etc/apache2/ports.conf
+# lsof 查看是否有其他进程绑定该端口，发现被 nginx 占用
+lsof -i :80
+# 终止 nginx 服务
+systemctl stop nginx
+# 删除 ngninx 应用
+apt remove nginx-common
+# 重新启动：
+root@ubuntu:~#  systemctl status apache2.service 
+● apache2.service - LSB: Apache2 web server
+   Loaded: loaded (/etc/init.d/apache2; bad; vendor preset: enabled)
+  Drop-In: /lib/systemd/system/apache2.service.d
+           └─apache2-systemd.conf
+   Active: active (running) since Sun 2025-10-19 07:49:50 CST; 7s ago
+     Docs: man:systemd-sysv-generator(8)
+  Process: 12072 ExecStart=/etc/init.d/apache2 start (code=exited, status=0/SUCCESS)
+   CGroup: /system.slice/apache2.service
+           ├─12087 /usr/sbin/apache2 -k start
+           ├─12088 /usr/sbin/apache2 -k start
+           └─12089 /usr/sbin/apache2 -k start
+
+Oct 19 07:49:49 ubuntu systemd[1]: Starting LSB: Apache2 web server...
+Oct 19 07:49:49 ubuntu apache2[12072]:  * Starting Apache httpd web server apache2
+Oct 19 07:49:50 ubuntu apache2[12072]: AH00558: apache2: Could not reliably determine the server's fully qualif
+Oct 19 07:49:50 ubuntu apache2[12072]:  *
+Oct 19 07:49:50 ubuntu systemd[1]: Started LSB: Apache2 web server.
+```
+
+此时，打开浏览器： `localhost:80` 已经可以正常打开了.
+
+- 配置服务文件
+
+| 配置文件名称 | 存放位置                                               |
+| ------------ | ------------------------------------------------------ |
+| 服务目录     | /etc/httpd; /etc/apache2                               |
+| 主配置目录   | /etc/httpd/conf/httpd.conf;  /etc/apache2/apache2.conf |
+| 网站数据目录 | /var/www/html                                          |
+| 访问日志     | /var/log/httpd/access_log; /var/log/apache2/access.log |
+| 错误日志     | /var/log/httpd/error_log; /var/log/apache2/error.log   |
+
+**第一个版本位于：/etc/httpd 目录；apache2 的配置文件已经分到了许多 /etc/apache2 子目录文件下了 **
+
+| 参数           | 用途                                                 |
+| -------------- | ---------------------------------------------------- |
+| ServerRoot     | 服务目录                                             |
+| ServerAdmin    | 管理员邮箱                                           |
+| User           | 运行服务的用户                                       |
+| Group          | 运行服务的用户组                                     |
+| ServerName     | 网站服务器的域名                                     |
+| DocumentRoot   | 网站数据保存目录                                     |
+| Directory      | 网站数据目录的权限                                   |
+| Listen         | 监听的端口号                                         |
+| DirectoryIndex | 默认的索引页页面, /etc/apache2/mods-enabled/dir.conf |
+| ErrorLog       | 错误日志文件                                         |
+| CustomLog      | 访问日志文件                                         |
+| Timeout        | 网页超时时间，默认300秒                              |
+
+- 网页数据默认保存在 `/etc/www/html` 如果要修改，则要修改 `DocumentRoot` 配置
+
+```shell
+# Apache2 /etc/apache2/sites-available/000-default.conf
+systemctl restart apache2 # 重启 apache httpd/apache2 服务
+systemctl enable apache2 # 开机子启动
+```
+
+
+
+###### SELinux 安全子系统
+
+对文件资源的访问限制，SELinux 安全上下文确保了文件资源只能被所属的服务程序进行访问。
+
+- 安装 SELinux 组件，默认没有打开
+
+```shell
+apt-get install selinux-utils
+
+root@ubuntu:~#  getsebool -a | grep ftp
+getsebool:  SELinux is disabled
+```
+
+TODO: 找不到这两个命令
+
+- getenforce - 获取 SELinux 的工作状态
+
+```shell
+getenforce
+```
+
+- semanage - 用户管理 SELinux 的策略
+
+```shell
+-l # 查询
+-a # add
+-m # modify
+-d # delete
+semanage fcontext -a -t httpd_sys_content_t /home/wwwroot # 向新的网站数据目录中增加一条 SELinux 安全上下文，让这个目录以及里面的所有文件都可以被 httpd 服务程序访问
+semanage fcontext -a -t httpd_sys_content_t /home/wwwroot/*
+```
+
+- restorecon
+
+如果执行完上述命令后仍然无法访问，还需要执行 `restorecon`命令将设置好的 SELinux 上下文立即生效
+
+```shell
+restorecon -Rv /home/wwwroot/
+```
+
+###### 个人主页功能
+
+当需要为每个用户建立一个独立的网站时 Apache httpd 服务提供了该功能，而不需要自己实现。
+
+https://www.cnblogs.com/escwq/p/11782912.html
+
+修改配置文件，打开 UserDir 功能：
+
+```shell
+# 对 web server 用户来说， ~userid 需奥 711 权限; ~userid/public_html 需要 755 权限
+# UserDir disabled
+UserDir public_html
+
+# 创建目录，增加权限
+su - qz
+mkdir public_html
+chmod -Rf 755 public_html/
+echo "This is $(users)'s homepage" > public_html/index.html
+
+# 重新启动 apache2 web 服务,
+# TODO: 主页没有生效, 仍然是 apache2 的 Index.html 界面
+systemctl restart apache2
+
+# 对于有 SecLinux 限制的机器，需要接触限制
+getsebool -a | grep http
+setsebool -P httpd_enable_homedirs=on
+```
+
+-  htpasswd - Manage user files for basic authentication
+
+设置需要输入用户名以及密码才可以访问主页
+
+
+
+- apache2 的方法和 httpd 已经不一样了，需要使用 `a2ensite` 命令
+
+TODO: apache2 个人主页暂时没找到搭建教程， 和 httpd 稍微有点区别
+
+```shell
+```
+
+
+
+TODO:
+
+- 博客元主页可以插入前端 CSS 代码 
+
+https://www.cnblogs.com/liuke123/p/10706087.html
+
+
+
+###### 虚拟主机功能
+
+可以把一台物理服务器分割成多个“虚拟的服务器”，避免多台服务器的费用。
+
+apache 的虚拟主机功能是服务器基于用户请求的不同 IP 地址，主机域名或端口号，实现提供多个网站同时为外部提供访问服务的技术。
+
+
+
+1. 基于 IP 地址：不同 ip 地址;
+2. 基于端口号: 相同 ip 不同端口号;
+3. 基于域名：相同 ip 以及端口，不同域名;
+
+- 基于 IP 地址（多宿主机）
+
+```shell
+# step1: 使用 nmtui 配置网卡，同时配置 3 个 IP
+# 192.168.10.10/24
+# 192.168.20.10/24
+# 192.168.30.10/24
+
+systemctl restart network-manager # 重启网络服务，
+# 确保 3 个 ip 的网络都可以正常访问， 
+# 首先 3 个 ip 本地都可以 ping 通， 虚拟机可以访问百度
+root@ubuntu:/etc/apache2# ifconfig
+ens33     Link encap:Ethernet  HWaddr 00:0c:29:28:3e:e6  
+          inet addr:192.168.10.10  Bcast:192.168.10.255  Mask:255.255.255.0 # 但是只有一个 ipv4 地址？？/
+          inet6 addr: 2408:8478:1b03:6220:aa04:7d7d:a4ae:3f65/64 Scope:Global
+          inet6 addr: fe80::afbd:cf89:b6f1:2e79/64 Scope:Link
+          inet6 addr: 2408:8478:1b03:6220:d5e6:d663:110c:c339/64 Scope:Global
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:33583 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:40766 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:36494327 (36.4 MB)  TX bytes:3859771 (3.8 MB)
+# 外部通过这 3 个 IP 都可以访问网络：
+mkdir -p /home/wwwroot/10
+mkdir -p /home/wwwroot/20
+mkdir -p /home/wwwroot/30
+echo "IP:192.168.10.10" > /home/wwwroot/10/index.html
+echo "IP:192.168.10.20" > /home/wwwroot/20/index.html
+echo "IP:192.168.10.30" > /home/wwwroot/30/index.html
+```
+
+修改配置文件 `vi /etc/httpd/conf/httpd.conf`， 修改后需要重启 httpd 服务
+
+```xml
+<VirtualHost 192.168.10.10>
+DocumentRoot /home/wwwroot/10
+ServerName www.linuxprobe.com
+<Directory>
+AllowOverride None
+Require all granted
+</Directory>
+</VirtualHost>
+
+<VirtualHost 192.168.10.20>
+DocumentRoot /home/wwwroot/20
+ServerName www.linuxprobe.com
+<Directory>
+AllowOverride None
+Require all granted
+</Directory>
+</VirtualHost>
+
+<VirtualHost 192.168.10.30>
+DocumentRoot /home/wwwroot/30
+ServerName www.linuxprobe.com
+<Directory>
+AllowOverride None
+Require all granted
+</Directory>
+</VirtualHost>
+```
+
+如果无法通过不同的 ip 访问主页，可能需要增加 SELinux 安全上下文。
+
+
+
+- 基于主机域名
+
+当服务器无法为每个网站都分配一个独立 IP 的时候，可以让 Apache 自动识别请求的域名，从而跟你据不同的域名请求来传输不同的内容。`/etc/hosts` 是强制把某个主机域名解析到指定的 ip 地址的配置文件。主要这个文件配置正确，即使网卡参数中没有 DNS 信息也能将域名解析为某个 IP 地址
+
+修改 `/etc/hosts` 配置文件，修改后立即生效
+
+```shell
+192.168.10.10 www.linuxprobe.com bbs.linuxprobe.com tech.linuxprobe.com
+```
+
+在主页目录下创建保存不同网页数据的文件以及网页
+
+```shell
+mkdir -p /home/wwwroot/www
+mkdir -p /home/wwwroot/bbs
+mkdir -p /home/wwwroot/tech
+echo "www.linuxprobe.com" > /home/wwwroot/www/index.html
+echo "bbs.linuxprobe.com" > /home/wwwroot/bbs/index.html
+echo "tech.linuxprobe.com" > /home/wwwroot/tech/index.html
+```
+
+修改 httpd 配置文件 `/etc/httpd/conf/httpd.conf`，然后重启 httpd 服务 `systemctl restart httpd` 才会生效
+
+```shell
+<VirtualHost 192.168.10.10>
+DocumentRoot /home/wwwroot/www
+ServerName www.linuxprobe.com
+<Directory "/home/wwwroot/www">
+AllowOverride None
+Require all granted
+</Directory>
+</VirtualHost>
+
+<VirtualHost 192.168.10.10>
+DocumentRoot /home/wwwroot/bbs
+ServerName bbs.linuxprobe.com
+<Directory "/home/wwwroot/bbs">
+AllowOverride None
+Require all granted
+</Directory>
+</VirtualHost>
+
+<VirtualHost 192.168.10.10>
+DocumentRoot /home/wwwroot/tech
+ServerName tech.linuxprobe.com
+<Directory "/home/wwwroot/tech">
+AllowOverride None
+Require all granted
+</Directory>
+</VirtualHost>
+```
+
+如果无法通过不同的 ip 访问主页，可能需要增加 SELinux 安全上下文。
+
+
+
+- 基于端口号
+
+基于端口号的虚拟主机功能可以让用户通过指定的端口号来访问服务器上的网站资源，一般来说，使用 80, 443, 8080 端口是比较合理的，使用其他端口则会收到 SELinux 的限制。
+
+创建文件夹以保存首页文件
+
+```shell
+mkdir -p /home/wwwroot/6111
+mkdir -p /home/wwwroot/6222
+echo "port:6111" > /home/wwwroot/6111/index.html
+echo "port:6222" > /home/wwwroot/6222/index.html
+```
+
+修改 httpd 服务配置文件 `vi /etc/httpd/conf/httpd.conf`，然后重启 httpd 服务 `systemctl restart httpd` 才会生效
+
+```xml
+# 增加监听端口
+Listen 80
+Listen 6111
+Listen 6222
+
+#虚拟主机
+<VirtualHost 192.168.10.10:6111>
+DocumentRoot /home/wwwroot/6111
+ServerName tech.linuxprobe.com
+<Directory "/home/wwwroot/6111">
+AllowOverride None
+Require all granted
+</Directory>
+</VirtualHost>
+
+<VirtualHost 192.168.10.10:6222>
+DocumentRoot /home/wwwroot/6222
+ServerName tech.linuxprobe.com
+<Directory "/home/wwwroot/6222">
+AllowOverride None
+Require all granted
+</Directory>
+</VirtualHost>
+```
+
+如果无法通过不同的 ip 访问主页，可能需要增加 SELinux 安全上下文。
+
+```shell
+semanage port -l | grep http
+semanage port -a -t http_port_t -p tcp 6111
+semanage port -a -t http_port_t -p tcp 6222
+```
+
+
+
+###### Apache 的访问控制
+
+**Apache 可以通过源主机名，源 IP 地址，或源主机上的浏览器特征等信息对网站上的资源访问进行控制。**
+
+Allow:
+
+Deny:
+
+```shell
+Order allow, Deny # 表示允许源主机与访问规则进行匹配，若匹配成功则允许访问，否则拒绝访问请求
+```
+
+编辑配置文件 `/etc/httpd/conf/httpd.conf`，然后重启 httpd 服务 `systemctl restart httpd`
+
+```shell
+<Directory "/var/www/html/server">
+Order allow,deny
+Allow from 192.168.10.10 # 仅允许该主机访问
+</Directory>
+```
+
+
 
 
 
 #### ch11 使用 vsftpd 服务传输文件
 
+```shell
+apt-get install ftp # 安装 FTP 客户端
+apt-getinstall vsftpd # FTP 服务
+
+man vsftpd # 查看帮助信息，就是一个 FTP 服务的守护进程
+
+systemctl enable vsftpd # 设置为开机子启动
+root@ubuntu:~#  systemctl status vsftpd # 安装完成后查看服务状态
+● vsftpd.service - vsftpd FTP server
+   Loaded: loaded (/lib/systemd/system/vsftpd.service; enabled; vendor preset: enabled)
+   Active: active (running) since Mon 2025-10-20 23:31:56 CST; 3min 2s ago
+ Main PID: 4176 (vsftpd)
+   CGroup: /system.slice/vsftpd.service
+           └─4176 /usr/sbin/vsftpd /etc/vsftpd.conf
+```
+
+FTP 服务守护进程名称  vsftpd(Very Secure File Transfer Protocol Daemon)
+
+服务配置文件 `/etc/vsftpd/vsftpd.conf`，
+
+```shell
+grep -v "#"  /etc/vsftpd/vsftpd.conf # -v, 反选中，仅显示不包含 # 的行
+```
+
+###### FTP 使用
+
+| 内部命令      | 命令说明                                       | 备注 |
+| ------------- | ---------------------------------------------- | ---- |
+| pwd           | 显示当前目录                                   |      |
+| put           | 上传                                           |      |
+| prompt        | 关闭交互模式                                   |      |
+| newer         | 下载时，检测是不是新文件                       |      |
+| mkdir         | 在远端ftp服务器上，建立文件夹                  |      |
+| mput          | 上传文件，模糊匹配，                           | 批量 |
+| mget          | 下载文件，模糊匹配                             | 批量 |
+| mdelete       | 删除文件，模糊匹配                             |      |
+| hash          | 显示#表示下载进度                              |      |
+| get           | 下载                                           |      |
+| delete        | 删除远端ftp服务器上的文件                      |      |
+| close         | 在不结束ftp进程的情况下，关闭与ftp服务器的连接 |      |
+| cdup          | 上一层目录                                     |      |
+| cd            | 切换远端ftp服务器上的目录                      |      |
+| ！            | 执行本地主机命令                               |      |
+| binary        | 设置文件传输方式为二进制模式                   |      |
+| ascii         | 设置文件传输方式为ASCII模式                    |      |
+| ls            | 显示服务器上的目录                             |      |
+| bye           | 退出ftp命令状态                                |      |
+| lcd directory | 改变本地的当前目录为directory                  |      |
+| cd directory  | 改变服务器的当前目录为directory                |      |
+| quit          | 断开连接并退出ftp服务器                        |      |
+| open          | 连接ftp服务器                                  |      |
+| put           | 从客户端传送指定文件到服务器                   |      |
+| get           | 从服务器下载指定文件到客户端                   |      |
+
+```shell
+ftp 192.168.10.10
+put abc.txt server_abc.txt # 将 本地的 abc.txt 推送到服务端的 server_abc.txt
+get server_abc.xt abc.txt # 从服务端下载到本地
+rename server_abc.txt abc.txt # 修改文件名
+```
+
+
+
+
+
+vsftpd 三种工作模式：
+
+1. 匿名开放模式 annomous
+2. 本地用户模式 local
+3. 虚拟用户模式
+
+参数：
+
+| 参数                                                 | 作用                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------ |
+| listen=[YES/NO]                                      | 是否以独立的方式监听服务                                     |
+| listen_address=IP                                    | 设置要监听的 IP 地址                                         |
+| listen_port=21                                       | 设置 FTP 服务要监听的端口                                    |
+| download_enable=[YES/NO]                             | 是否允许下载文件                                             |
+| userlist_enable=[YES/NO]<br />userlist_deny=[YES/NO] | 设置用户列表（通过用户列表同意/禁止制定用户 FTP 客户端登录） |
+| max_clients=0                                        | 最大客户端连接数，0表示不限制                                |
+| max_per_ip=0                                         | 同一 IP 的最大连接数，0表示不限制                            |
+| anonymous_enable=[YES/NO]                            | 是否允许匿名用户访问                                         |
+| anon_upload_enable=[YES/NO]                          | 是否允许匿名用户上传文件                                     |
+| anon_umask=022                                       | 匿名用户上传文件的 umask 值                                  |
+| anon_root=/var/ftp                                   | 匿名用户的 FTP 根目录                                        |
+| anon_mkdir_write_enable=[YES/NO]                     | 是否允许匿名用户创建目录                                     |
+| anon_other_write_enable=[YES/NO]                     | 是否开放匿名用户的其他写入权限（包括重命名，删除等）         |
+| anon_max_rate=0                                      | 匿名用户上传的最大速度(Bytes/s)，0表示不限制                 |
+| local_enable=[YES/NO]                                | 是否允许本地用户登录 FTP                                     |
+| local_umask=022                                      | 本地用户上传文件的 umask 值                                  |
+| local_root=/var/ftp                                  | 本地用户的 FTP 根目录                                        |
+| chroot_local_user=[YES/NO]                           | 是否将用户权限禁锢在 FTP 目录，以确保安全                    |
+| local_max_rate                                       | 本地用户上传的最大速度(Bytes/s)，0表示不限制                 |
+
+###### 匿名开放模式
+
+// TODO: 这个匿名模式总是报各种权限问题。
+
+设置参数 `vi /etc/vsftpd.conf`， 然后重启 vsftpd 服务 `systemctl restart vsftpd`
+
+```shell
+anonymous_enable=YES
+anon_umask=022
+anon_upload_enable=YES
+anon_mkdir_write_enable=YES
+anon_other_write_enable=YES
+```
+
+FTP 客户端登录：
+
+```shell
+ftp 192.168.10.10
+账户： annonymous
+密码：空
+```
+
+登录成功，但是创建文件失败，/var/ftp 目录 ftp 用户没有写权限,修改用户权限	
+
+```shell
+ls -ld /var/ftp/pub
+mkdir -p /var/ftp/pub
+chown -Rf ftp /var/ftp/pub # 默认访问的是 /var/ftp 目录， 查看权限，只有 root 才有写入权限，将目录的所有者改为 user ftp
+#  ftp 账户在用户中已经存在， ls -l /etc/passwd | grep ftp
+# /var/ftp 运行的用户通常是 ftp/vsftpd
+
+# 仍然报错是什么原因???
+ftp>  cd pub
+550 Failed to change directory.
+
+# /var/ftp 目录加上了 0777 权限，仍然报错：
+修改权：确保 chroot 目录的根目录（"/"）不是可写的。你可以通过修改目录权限来实现这一点。例如，如果你使用的是 /var/ftp 作为 chroot 目录，你应该确保 /var/ftp 的父目录 / 不是可写的。
+```
+
+###### 本地用户模式
+
+编辑配置
+
+```shell
+anonymous_enable=NO
+local_enalbe=YES
+write_enable=YES
+local_umask=YES
+```
+
+###### 虚拟用户模式
+
+三种模式中最安全的一种认证模式。它需要为 FTP 服务单独建立用户数据库文件，**虚拟出用来进行口令验证的账户信息，而这些账户信息在服务器系统中实际上是不存在的，仅供 FTP 程序内部使用**。这样即使黑客破解了账户信息也无法登录服务器，从而有效降低了破坏范围。
+
+
+
+配置参数：
+
+```shell
+anonymous_enable=NO
+local_enable=YES
+guest_enable=YES # 开启虚拟用户模式
+guest_username=virtual # 指定虚拟用户帐号
+pam_service_name=vsftpd.vu # 指定 Pam 文件, 表示登陆 FTP 服务器时是根据 /etc/pam.d/vsftpd 文件进行安全认证的
+# 我们现在要做的就是把 vsftpd 主配置文件中原有的 PAM 认证文件 vsftpd 修改为新建的 vsftpd.vu 即可
+```
+
+###### PAM
+
+一组安全机制的模块，系统管理员可以轻易的调整服务程序的认证方式，而不必对应用程序进行任何修改。PAM 采取了分层设计（应用程序层，应用接口层，鉴别模块层）。
+
+
+
+######  TFTP - 简单文件传输协议
+
+Trivial File Transfer Protocol 是一种基于 UDP 协议在客户端和服务端之间进行简单文件传输的协议。**简单文件传输，甚至不支持遍历目录。提供不复杂，开销不大的文件传输服务**
+
+TFTP 在传输时使用 UDP 协议，69 端口，因此传输过程不像 FTP 那样可靠。但是 TFTP 不需要客户端的权限认证，也就减少了无谓的系统和网络带宽消耗，因此在传输琐碎(trivial)不大的文件时，效率更高。
+
+```shell
+apt-get install tftp
+apt-get install tftp-server
+apt-get install xinetd
+```
+
+**TFTP 是使用 xinetd 服务程序来管理的，xinetd 服务可以用来管理多种轻量级的网络服务，而且具有强大的日志功能。**
+
+安装 TFTP 后，需要在 xinetd 服务程序中将其开启，把默认的 disable 修改为 no
+
+xiugai  tftp 配置文件 `vim /etc/xinet.d/tftp` ，修改后重启 xinetd 服务 `systemctl restart xinetd`
+
+```shell
+systemctl enable xinetd # 开机启动
+
+firewall-cmd --permanent --add-port=69/udp # 防火墙打开 udp 69 端口
+firewall-cmd --realod # 重新加载防火墙
+
+# This is the udp version.
+service tftp
+{
+	socket_type		= dgram
+	protocol		= udp
+	wait 			= yes
+	user 			= root
+	server 			=  /usr/sbin/in.tftpd
+	server_args 	= --secure /var/lib/tftpboot
+	disable 		= no
+	per_source		= 11
+	cps				= 100 2
+	flags			= IPv4
+}
+```
+
+TFTP 的根目录为：`/var/lib/tftpboot`，
+
+客户端登陆：
+
+```shell
+tftp # 192.168.10.10 直接连接
+verbose # 打印日志模式
+connect 192.168.10.10
+status
+
+tftp>  get test.txt # 下载文件
+getting from 192.168.10.10:test.txt to test.txt [netascii]
+Received 37402 bytes in 0.0 seconds [inf bits/sec]
+
+tftp> put vuser.db vuser.db
+putting vuser.db to 192.168.10.10:vuser.db [netascii]
+Error code 1: File not found
+
+# TODO: 网上说 put 要使用绝对路径，仍然失败，/var/lib/tftpboot 文件夹的 owner 已经修改为了 o+w 也不行
+tftp>  put /tmp/vuser.db /var/lib/tftpboot/vuser.db
+putting /tmp/vuser.db to 192.168.10.10:/var/lib/tftpboot/vuser.db [netascii]
+Error code 1: File not found
+
+quit # 退出
+```
+
 
 
 #### ch12 使用 Samba 或 NFS 实现文件共享
+
+- SMB 协议（Server Message Block）
+
+旨在解决局域网内的文件或打印机等资源的共享问题。
+
+
+
+###### Samba 
+
+**TODO:**
+
+1. samba 服务安装后 smbd 守护进程正常运行，但是没有 smb 用户导致 `pdbedit` 命令运行异常。
+2. 手动创建 smb 用户并且通过 smbpasswd 添加到 smb 用户数据库后，pdbedit 命令仍然无法使用;
+3. 手动修改共享目录 `/home/database` 以及 `/var/samba` 目录 owner 为创建的 smb 用户后 `systemctl start smbd` 命令运行失败，smbd 服务启动失败;
+4. **后续继续研究一下， 共享目录的实验没做成功。**
+
+
+
+samba - Server to provide AD and SMB/CIFS services to clients
+
+基于 SMB 协议的服务程序，可以实现 Linux 与 windows 间共享文件。
+
+```shell
+apt-get install samba
+apt-get install samba-client # 如果需要 SMB 客户端的话
+#配置文件 /etc/samba/smb.conf
+systemctl status smbd # 安装后自动启动守护进程, 注意进程名字
+
+man samba
+
+qz@ubuntu:/tmp$  samba
+samba             samba_kcc         samba_spnupdate   samba_upgradedns  
+samba_dnsupdate   samba-regedit     samba-tool  
+```
+
+配置选项：
+
+| [global]       | 参数                                    | 作用                                                       |
+| -------------- | --------------------------------------- | ---------------------------------------------------------- |
+|                | workgroup=MYGROUP                       | 工作组名称                                                 |
+|                | server string = Samba Server Version %v | 服务器介绍信息，参数 %v 为显示 SMB 版本号                  |
+|                | log file=/var/log/samba/log.%m          | 日志文件的存放位置与名称， %m 为来访的主机名               |
+|                | max log size=50                         | 日志的最大容量为 50KB                                      |
+| 安全验证的方式 | security=user                           | 安全验证的方式，总共 4 种                                  |
+| 1              | 1. share                                | 来访主机不用验证口令，比较方便，但是安全性差               |
+| 2              | 2. user                                 | 需验证来访主机提供的口令后才可以访问，提升了安全性         |
+| 3              | 3. server                               | 使用独立的远程主机验证来访主机提供的口令（集中管理账户）   |
+| 4              | 4. domain                               | 使用域控制器进行身份验证                                   |
+| 用户后台的类型 | passdb backend=tdbsam                   | 定义用户后台的类型，共三种                                 |
+| 1              | 1. smbpasswd                            | 使用 smbpasswd 命令为系统用户设置 samba 服务程序的密码     |
+| 2              | 2. tdbsam                               | 创建数据库文件兵使用 pdbedit 命令建立 samba 服务程序的用户 |
+| 3              | 3. ldapsam                              | 基于 LDAP 服务进行帐号验证                                 |
+|                | load printers=yes                       | 设置在 samba 服务启动时是否共享打印机设备                  |
+|                | cup options=raw                         | 打印机的选项                                               |
+| [homes]        |                                         | 共享有关的参数                                             |
+|                | comment=Home Directories                | 描述信息                                                   |
+|                | bowseable=no                            | 指定共享信息是否在“网上邻居”中可见                         |
+|                | writable=yes                            | 定义是否可以执行写入操作，与 'read only' 相反              |
+| [printers]     |                                         | 打印机共享有关的参数                                       |
+|                |                                         |                                                            |
+
+配置共享服务
+
+1. 全局配置参数：用于设置整体的资源共享环境，对立面的每一个独立的共享资源都有效
+2. 区域配置参数：用于设置单独的共享环境，仅对该资源有效
+
+
+
+配置参数：
+
+```shell
+[database] # 共享名称为 database
+comment=Do Not arbitrarily modify the database file # 注释信息
+path=/home/database
+public=no # 关闭所有人可见
+writable=yes # 允许写入操作
+
+systemctl restart smbd # 重启 smbd 服务
+```
+
+step1 创建用于访问共享资源的账户信息，samba 服务默认使用的是用户口令认证模式(user)。只有建立账户数据库后才可以使用口令认证模式。
+
+**samba 服务的数据库文件要求 “账户”必须在当前系统中已经存在，否则日后创建文件时将导致文件的权限属性混乱不堪，由此引发错误。**
+
+- pdbedit - manage the SAM database (Database of Samba Users)
+
+用户管理 SMB 服务程序的账户信息数据库，
+
+```shell
+pdbedit --help
+-a 用户名 # 建立 samba 账户
+-x 用户名 # 删除 samba 账户
+-L # list
+-u username # 用户名
+-Lv # list verbose information
+```
+
+- smbpasswd - change a user's SMB password
+
+```shell
+-a # This option specifies that the username following should be added to the local smbpasswd file, with the new password typed (type <Enter> for the old password). This option is ignored if the username following already exists in the smbpasswd file and it is treated like a regular change password command. Note that the default passdb backends require the user to already exist in the system password file (usually /etc/passwd), else the request to add the user will fail. This option is only available when running smbpasswd as root.
+```
+
+- testparm -  - check an smb.conf configuration file for internal correctness
+
+可以用来测试 smb.conf 中的参数配置是否正确
+
+```shell
+```
+
+
+
+添加账户信息：
+
+```shell
+qz@ubuntu:/home/database$  pdbedit -a -u qz # 添加账户信息报错
+new password:
+retype new password:
+tdbsam_open: Failed to open/create TDB passwd [/var/lib/samba/private/passdb.tdb]
+tdbsam_getsampwnam: failed to open /var/lib/samba/private/passdb.tdb!
+tdbsam_open: Failed to open/create TDB passwd [/var/lib/samba/private/passdb.tdb]
+tdbsam_new_rid: failed to open /var/lib/samba/private/passdb.tdb!
+```
+
+Q: 若 smbd 进程显示没有找到 smb 用户，通常由配置文件路径错误或服务未正确启动导致。以下是排查步骤：
+
+A: 没有 smb 用户
+
+```shell
+useradd -s /sbin/nologin smb # 
+smbpasswd -a smb # 账户&密码:smb
+```
+
+- 修改共享目录的访问权限/owner
+
+```shell
+chmod -R 777 /home/database
+chown -R smb /home/database # smbd 进程通过 smb 账户访问
+chown -R smb /var/lib/samba # 修改 samba 文件的的 owner
+```
+
+
+
+- SELinux 未使能, 如果使能了还需要打开 samba 相关选项
+
+```shell
+qz@ubuntu:/home/database$  getsebool
+getsebool:  SELinux is disabled
+```
+
+
+
+
+
+- SMB 客户端测试
+
+Windows:
+
+1. 打开IE浏览器输入file://IP/myshare/ 然后输入用户名和密码
+
+2. Win+R: 
+
+```shell
+\\192.168.10.10
+```
+
+Linux:
+
+```shell
+smblcient -L \\192.168.10.10 -U qz
+```
+
+
+
+###### NFS 
+
+Network File System - 网络文件系统
+
+**觉得 samba 配置麻烦且需要共享文件的主机都是 Linux 系统，则推荐大家部署 NFS 服务来共享文件。NFS 服务可以将远程 Linux 系统上的文件资源挂载到本地主机的目录上。从而使得本地主机基于 TCP/IP 协议，像使用本地主机上的资源那样读写远程 Linux 系统上的共享文件**
+
+```shell
+# yum install nfs-utils # CentOS
+apt-get install nfs-kernel-server
+systemctl status nfs-kernel-server # 查看服务运行状态, nfs-server 一样的
+ps -aux | grep nfs # nfsd
+
+root@ubuntu:/#   systemctl status nfs-kernel-server
+● nfs-server.service - NFS server and services
+   Loaded: loaded (/lib/systemd/system/nfs-server.service; enabled; vendor preset: enabled)
+   Active: active (exited) since Thu 2025-10-23 11:09:39 CST; 28s ago
+```
+
+两台 Linux 主机一台 NFS 客户端，一台 NFS 服务端
+
+```shell
+# step1: 设置客户端以及服务端的 ip 地址：
+# 这里设置为同一网段
+
+# step2:在 NFS 服务器上建立用于 NFS 文件共享的目录，并设置足够的权限确保其他人也有写入权限
+mkdir /nfsfile
+chmod -R 777 /nfsfile
+
+# step3:配置 NFS 服务程序为 /etc/exports
+# 允许 192.168.10.0/24 网段的所有主机访问，
+/nfsfile 192.168.10.*(rw,sync,root_squash)
+
+# step4:重启 NFS 服务
+# 由于在使用 NFS 服务进行文件共享之前，需要使用 RPC(Remote Procedure Call)服务将 NFS 服务器的 IP 地址和端口号等信息发送给客户端。因此在启动 NFS 服务之前，还需要重启并启用 rpcbind 服务程序。
+systemctl restart rpcbind
+systemctl enable rpcbind
+systemctl restart nfs-server # 
+```
+
+- exportfs - exportfs - maintain table of exported NFS file systems
+
+```shell
+#-a     Export or unexport all directories.
+exportfs -ra # 重新加载 NFS 配置参数
+systemctl restart nfs-server
+
+# subtree_check 需要指定
+# exportfs: /etc/exports [2]: Neither 'subtree_check' or 'no_subtree_check' specified for export "*:/nfsfile".
+#  Assuming default behaviour ('no_subtree_check').
+#  NOTE: this default has changed since nfs-utils version 1.0.x
+
+```
+
+- 清空防火墙, 这里是 iptables & firewalld
+
+网络文件夹权限说明：
+
+| 参数           | 作用                                                         |
+| -------------- | ------------------------------------------------------------ |
+| ro             | 只读                                                         |
+| rw             | 读写                                                         |
+| root_squash    | 当 NFS 客户端以 root 管理员访问时，映射为 NFS 匿名文件       |
+| no_root_squash | 当 NFS 客户端以 root 管理晕访问时，映射为 NFS 服务器的 root 管理员 |
+| all_squash     | 无论 NFS 客户端使用什么帐号访问，均映射为 NFS 服务器的匿名用户 |
+| sync           | 同时将数据写入到内存与硬盘中，保证数据不丢失                 |
+| async          | 优先将数据保存到内存，然后再写入硬盘，这样效率更高，但可能会丢失数据 |
+
+
+
+---
+
+- NFS 客户端的配置
+
+- showmount -  - show mount information for an NFS server
+
+```shell
+-e # 显示 NFS 服务器的共享列表
+-a # 显示本机挂在的文件资源情况
+-v # 显示版本号
+
+root@ubuntu:/#  showmount  -e
+Export list for ubuntu:
+/nfsfile 192.168.10.*
+```
+
+​	客户端挂在 NFS 目录：
+
+```shell
+# 在客户端创建一个挂载文件夹
+mkdir /home/qz/nfsfile
+mount -t nfs 192.168.10.10:/nfsfile /home/qz/nfsfile
+# 如果需要开机自动挂载，则需要修改 /etc/fstab 配置文件
+192.168.10.10:/nfsfile /home/qz/nfsfile nfs defaults 0 0
+```
+
+- 查看本地磁盘信息
+
+```shell
+df -h
+```
+
+
+
+###### autofs 自动挂载服务
+
+无论是 samba 服务还是 NFS 服务，都需要把挂载信息写入到 `/etc/fstab` 中，在开机的时候自动挂载。但是如果挂载的远程资源太多，会很浪费网络带宽以及硬件资源。如果挂载后长期不使用也会浪费硬件资源。
+
+autofs 是一个自动挂载服务，当检测到用户使用时，才会自动挂载。从而节省了网络资源和服务器的硬件资源。
+
+```shell
+apt-get install autofs
+systemctl status autofs
+ps -aux | grep autofs
+# root      10080  0.0  0.0  57100  3332 ?        Ssl  12:19   0:00 /usr/sbin/automount --pid-file /var/run/autofs.pid
+```
+
+修改 autofs 的主配置文件 `/etc/auto.master`，按照 “挂载目录，子配置文件” 的格式填写。
+
+1. 挂载目录是挂在位置的的上一级目录, 例如：`挂载到 /media/cdrom`，则写 `/media` 即可;
+2. 子配置文件会对这个挂载目录内的配置文件进一步说明，子配置文件没有严格的名字规定，但必须以  `.misc` 结尾;
+
+```shell
+# 挂载到 /media/cdrom 目录
+/media /etc/iso.misc
+```
+
+3. 子配置文件格式：“挂在目录 挂载文件类型以及权限:设备名称”，例如 `/etc/iso.misc`
+
+```shell
+iso		-fstype=iso9660,ro,nosuid,nodev:/dev/cdrom
+```
+
+重启 autofs 服务
+
+```shell
+systemctl restart autofs
+systemctl enable autofs # 将 autofs 加入到系统启动项中
+```
 
 
 
 #### ch13 使用 BIND 提供域名解析服务
 
+// TODO:
+
+bind9 也需要好好研究一下：
+
+https://blog.51cto.com/yuanbin/108578
+
+
+
+BIND - Berkeley Internet Name Domain 服务是全球使用最广泛最安全且高效的域名解析服务程序。
+
+```shell
+apt get install bind9
+#apt-get install bind-chroot # CentOS
+systemctl start bind9 # 开启服务
+systemctl enable --now bind9 # 开机自启动
+systemctl status bind9
+```
+
+**在 Linux 系统中，BIND 服务的名称为 named,**
+
+
+
+用到的相关 shell 指令：
+
+- resolvconf - manage nameserver information
+
+resolvconf 是用于管理 /etc/resolv.conf 文件的命令行工具，主要用于动态更新 DNS 配置。
+
+```shell
+-u # Just run the update scripts (if updating is enabled).
+--enable-updates # Set the flag indicating that resolvconf should run update scripts when invoked in the future with -a, -d or -u.  If a  delayed  update was scheduled then run update scripts.
+--disable-updates # Clear the flag.
+--updates-are-enabled # Return 0 if the flag is set, otherwise return 1.
+systemctl status resolvconf # 还是一个后台运行的服务
+
+root@ubuntu:/tmp# systemctl status resolvconf
+● resolvconf.service - Nameserver information manager
+   Loaded: loaded (/lib/systemd/system/resolvconf.service; enabled; vendor preset: enabled)
+   Active: active (exited) since Thu 2025-10-23 21:37:23 CST; 1h 6min ago
+     Docs: man:resolvconf(8)
+  Process: 512 ExecStart=/sbin/resolvconf --enable-updates (code=exited, status=0/SUCCESS)
+  Process: 497 ExecStartPre=/bin/touch /run/resolvconf/postponed-update (code=exited, status=0/SUCCESS)
+  Process: 494 ExecStartPre=/bin/mkdir -p /run/resolvconf/interface (code=exited, status=0/SUCCESS)
+ Main PID: 512 (code=exited, status=0/SUCCESS)
+   CGroup: /system.slice/resolvconf.service
+
+Oct 23 21:37:22 ubuntu systemd[1]: Starting Nameserver information manager...
+Oct 23 21:37:23 ubuntu systemd[1]: Started Nameserver information manager.
+
+resolvconf --enable-updates	# 强制 resolvconf 更新
+resolvconf -u
+systemcrl restart resolvconf # 重启服务
+```
+
+
+
+- nslookup - query Internet name servers interactively
+
+一个可以进行域名查询的测试指令
+
+https://cloud.tencent.com/developer/article/2169208
+
+```shell
+type可以为一下类型：
+ A ：地址记录（直接查询默认类型）
+ AAAA ：地址记录
+ AFSDB： Andrew文件系统数据库服务器记录
+ ATMA ：ATM地址记录
+ CNAME： 别名记录
+ HINFO： 硬件配置记录，包括CPU、操作系统信息
+ ISDN： 域名对应的ISDN号码
+ MB： 存放指定邮箱的服务器
+ MG： 邮件组记录
+ MINFO： 邮件组和邮箱的信息记录
+ MR： 改名的邮箱记录
+ MX： 邮件服务器记录
+ NS： 名字服务器记录
+ PTR： 反向记录
+ RP： 负责人记录
+ RT： 路由穿透记录
+ SRV： TCP服务器信息记录
+ TXT： 域名对应的文本信息
+ X25： 域名对应的X.25地址记录
+
+nslookup -type=A www.baidu.com # 查询 ipv4 地址
+nslookup -type=AAAA www.baidu.com # 查询 ipv6 地址
+nslookup -type=HINFO www.baidu.com # 查询硬件信息
+nslookup -type=CNAME www.baidu.com # 查询别名
+```
+
+- rndc - name server control utility
+
+```shell
+man rndc
+```
+
+
+
+
+
+
+
+- /var/run/named.pid
+
+这个文件用来记录 named 进程的 pid，这个文件是给那些需要向运行的进程们发送信号的程序使用的。`/var/run` 目录下有很多后台程序的 pid 信息。
+
+- 配置文件
+
+主配置文件： `/etc/bind/named.conf`
+
+区域配置文件：`/etc/named.rfc1912.zones`用来保存域名和 IP 地址对应关系所在位置
+
+数据配置文件：`/var/named` 用来保存域名和 ip 真实对应关系
+
+- 服务类型有三种：
+
+1. hint : 根区域
+2. master: 主区域， 主服务器
+3. slave: 从区域，从服务器
+
+###### 正向解析实验
+
+域名 -> IP
+
+step1:修改 “区域配置文件” CentOS: `/etc/named.rf1912.zones`, ubuntu 这里为：`/etc/named/named.conf.default-zones`
+
+```shell
+# 增加 "正向解析参数"
+zone "linuxprobe.com" IN{
+	# 服务类型
+	type master;
+	# 域名与 IP 地址解析规则保存的文件位置
+	file "linuxprobe.com.zone";
+	# 允许哪些客户机动态更新解析信息
+	allow-update {none; };
+};
+# 反向解析参数
+#表示 192.168.10.0/24 网段的反向解析区域
+zone "10.168.192.arpa" IN{
+	type master;
+	file "192.168.10.arpa"
+}
+```
+
+step2:修改数据配置文件 `/var/named/linuxprobe.com.zone` , **bind9 应该有修改，或者是 CentOS 和 ubuntu 的区别？？？ 将 /var/named 目录下的配置文件移动到了 /etc/named 下，名称改为 db.xxx**，这里是：`/etc/named/db.linuxprobe`
+
+```shell
+cp -a db.empty db.linuxprobe # 复制时，加上 -a 参数，复制时保留原始文件的所有者，所属组，权限属性等信息，以便让 BIND 服务程序顺利读取
+#  模板文件 named.localhost -> db.empty
+
+# 文件示例：
+$TTL 86400
+#授权信息开始 			# DNS区域的地址	  #域名管理员的邮箱
+@       IN      SOA     ns1.example.com. admin.example.com. ( 
+                              2023031501   ; Serial #更新序列号
+                              3600         ; Refresh # 更新时间
+                              1800         ; Retry # 重试延时
+                              604800       ; Expire # 失效时间
+                              86400        ; Minimum TTL # 无效解析记录的缓存时间
+                        )
+        IN      NS      ns1.example.com. #域名服务器记录
+        IN      NS      ns2.example.com. # 
+        IN      A       192.0.2.1 # 地址记录： 
+ns1     IN      A       192.0.2.1 # 地址记录：ns1.example.com
+ns2     IN      A       192.0.2.2 # 地址记录： ns2.example.com
+www     IN      A       192.0.2.100 # 地址记录： www.example.com
+
+# systemctl restart bind9 不会报错了，但是 正向解析实验一直没有生效，已经修改了 DNS server 的地址了呀。。
+root@ubuntu:/etc/bind#   cat db.linuxprobe 
+; BIND reverse data file for empty rfc1918 zone
+;
+; DO NOT EDIT THIS FILE - it is used for multiple zones.
+; Instead, copy it, edit named.conf, and use that copy.
+;
+$TTL	86400
+@	IN	SOA	linuxprobe.com. root.linuxprobe.com. (
+			      1		; Serial
+			 604800		; Refresh
+			  86400		; Retry
+			2419200		; Expire
+			  86400 )	; Negative Cache TTL
+;
+@	IN	NS	www
+@	IN	NS 	bss
+@	IN	NS 	tech
+@	IN	A 	192.168.10.10
+www	IN	A	192.168.10.10
+bss	IN	A	192.168.10.10
+tech	IN	A	192.168.10.10
+
+```
+
+保存配置文件后重启 BIND 服务程序
+
+```shell
+# systemctl restart named
+systemctl restart bind9
+systemctl restart network-manager # 重启网络
+```
+
+**一定要把 Linux 系统网卡中的 DNS 地址参数更换成本机 IP 地址，这样就可以使用本机提供哦嗯的 DNS 服务查询了**
+
+```shell
+nmtui # 修改 DNS server,原来的 DNS server 为网关地址:172.20.10.1
+```
+
+step3: 测试实验结果
+
+```shell
+# 以前
+root@ubuntu:/etc/bind#   nslookup 
+> www.linuxprobe.com
+Server:		127.0.1.1
+Address:	127.0.1.1#53
+Non-authoritative answer:
+Name:	www.linuxprobe.com
+Address: 8.138.155.96
+
+> bbs.linxprobe.com
+Server:		127.0.1.1
+Address:	127.0.1.1#53
+** server can't find bbs.linxprobe.com: NXDOMAIN
+
+# 使用 bind9 后
+# 手动指定 DNS server 为 192.168.10.10 的情况下， DNS 正常，
+# 否则仍然使用的是默认的 DNS server (gateway address)进行解析的, 使用 nmtui 工具修改了 DNS server 的 IP 没有生效???
+root@ubuntu:/etc/bind#  nslookup 
+> server 192.168.10.10
+Default server: 192.168.10.10
+Address: 192.168.10.10#53
+> www.linuxprobe.com # 手动指定 DNS server IP
+Server:		192.168.10.10
+Address:	192.168.10.10#53
+
+Name:	www.linuxprobe.com
+Address: 192.168.10.10
+> 
+> 
+> tech.linuxprobe.com
+Server:		192.168.10.10
+Address:	192.168.10.10#53
+
+Name:	tech.linuxprobe.com
+Address: 192.168.10.10
+> bss.linuxprobe.com
+Server:		192.168.10.10
+Address:	192.168.10.10#53
+
+Name:	bss.linuxprobe.com
+Address: 192.168.10.10
+```
+
+
+
+###### 反向解析实验
+
+IP -> 域名
+
+一般用于：
+
+1. 对某个 IP 上绑定的所有域名进行屏蔽，屏蔽由某个域名发送的垃圾邮件等操作;
+2. 针对某个 IP 进行反向解析，进而判断出有多少个网站运行在上面，当购买虚拟主机时，可以通过这个判断有多少个网站运行在上面，进而判断是否有超售问题;
+
+- 配置参数
+
+step1: 编辑 “区域配置文件” `/etc/bind/named.conf.default-zones`，反向解析在配置中需要把域名反写， ip 地址：192.168.10 -》 10.168.192
+
+```shell
+#反向解析参数
+zone "10.168.192.arpa" IN{
+	type master;
+	file "/etc/bind/192.168.10.arpa"
+}
+```
+
+step2:编辑 “数据配置文件” `/etc/bind/192.168.10.arpa` 或 `/etc/bind/db.10.168.192` ubuntu 上这样写。**只需要写主机号，不需要写网络号**
+
+```shell
+$TTL    86400
+@       IN      SOA     ns1.example.com. admin.example.com. (
+                              2023041501 ; Serial
+                              3600       ; Refresh
+                              1800       ; Retry
+                              604800     ; Expire
+                              86400      ; Minimum TTL
+                        )
+        IN      NS      ns1.example.com.
+        IN      NS      ns2.example.com.
+
+; PTR records for IP addresses in the 192.168.1.0/24 network
+1               IN      PTR     host1.example.com.
+2               IN      PTR     host2.example.com.
+; Add more PTR records as needed for other IP addresses in your network
+
+#linuxprobe
+@       IN      SOA     linuxprobe.com. admin.linuxprobe.com. (
+                              2023041501 ; Serial
+                              3600       ; Refresh
+                              1800       ; Retry
+                              604800     ; Expire
+                              86400      ; Minimum TTL
+                        )
+        IN      NS      www.linuxprobe.com.
+        IN      NS      tech.linuxprobe.com.
+        IN      NS      bss.linuxprobe.com.
+
+; PTR records for IP addresses in the 192.168.1.0/24 network
+10               IN      PTR     www.linuxprobe.com.
+10               IN      PTR     tech.linuxprobe.com.
+10               IN      PTR     bss.linxprobe.com.
+```
+
+step3: 测试
+
+```shell
+root@ubuntu:/etc/bind#  nslookup 
+> server 192.168.10.10
+Default server: 192.168.10.10
+Address: 192.168.10.10#53
+>  192.168.10.10
+Server:		192.168.10.10
+Address:	192.168.10.10#53
+
+** server can't find 10.10.168.192.in-addr.arpa: NXDOMAIN
+> exit
+
+```
+
+###### 部署从服务器
+
+——DNS 服务器的稳定性非常重要
+
+DNS 域名解析服务器中，从服务器可以从主服务器上获取指定的区域数据文件，从而起到备份解析记录与负载平衡的作用，因此通过部署从服务器可以减轻主服务器的负载压力，还可以提升用户的查询效率。
+
+step1: 在主服务器中，允许从服务器的更新请求，
+
+修改配置文件`/etc/named.rfc1912.zones`，重启 dns 服务 `systemctl restart bind9`
+
+```shell
+zone "linuxprobe.com" IN {
+	type master;
+	file "linuxprobe.com.zone";
+	allow-update {192.168.10.20; };
+};
+
+zone "10.168.192.in-addr.arpa" IN {
+	type master;
+	file "192.168.10.arpa";
+	allow-update {192.168.10.20; };
+};
+```
+
+step2: 在从服务器中填写主服务器的 IP 地址以及要抓取的区域信息，然后重启服务。**注意此时的服务类型是 slave 而不是 master**
+
+file 参数后面定义的是同步数据配置文件后要保存到的位置，
+
+```shell
+zone "linuxprobe.com" IN {
+	type slave;
+	masters {192.168.10.10; }
+	 #从服务器同步数据配置文件后要保存的位置
+	file "slaves/linuxprobe.com.zone"
+};
+
+zone "10.168.192.in-addr.arpa" IN {
+	type slave;
+	masters {192.168.10.10; };
+	file "slaves/192.168.10.arpa";
+};
+```
+
+step3: 从服务器启动后即会自动从主服务器同步配置文件到指定目录。在从服务器使用 nslookup 测试
+
+```shell
+nslookup # 
+www.linuxprobe.com
+192.168.10.10
+```
+
+
+
+###### 安全的加密传输
+
+ 互联网中绝大多数(>=95%)的 DNS 服务器都是基于 BIND 域名解析服务搭建的，而 BIND 服务为了提供安全的解析服务，已经对 TSIG(RFC2845) 加密机制提供了支持。TSIG 加密机制保证了 DNS 服务器之间传输域名区域信息的安全性(UDP 53 端口)。
+
+- dnssec-keygen - - DNSSEC key generation tool
+
+```shell
+# -a algorithm
+# -b keysize
+# -n nametype
+root@ubuntu:/etc/bind#  dnssec-keygen -a HMAC-MD5 -b 128 -n HOST master-slave
+Kmaster-slave.+157+49463
+
+```
+
+配置 DNS 服务的加密传输：
+
+step1: 生成密钥
+
+```shell
+dnssec-keygen -a HMAC-MD5 -b 128 -n HOST master-slave
+```
+
+step2: 在主服务器中创建密钥验证文件 `/etc/transfer.key`
+
+```shell
+key "master-slave" {
+	algorithm hmac-md5;
+	secret "IdPhCVwbEkaye8AV3f75yw==";
+};
+
+chown root:named transfrer.key
+chmod 640 transfer.ky
+ln transfer.key /etc/transfre.key # 创建链接文件
+```
+
+step3: 主服务器开启并加载 bind 服务的密钥验证功能， `/etc/named.conf`
+
+```shell
+include "/etc/tranfer.key"
+allow-transfer {key master-slave; };
+```
+
+step4: 从服务器使其支持密钥验证，配置 DNS 从服务器和主服务器的方法大致相同，都需要在 bin 服务程序的配置文件中创建密钥认证文件. 
+
+```shell
+key "master-slave" {
+	algorithm hmac-md5;
+	secret "IdPhCVwbEkaye8AV3f75yw==";
+};
+
+chown root:named transfrer.key
+chmod 640 transfer.ky
+ln transfer.key /etc/transfre.key # 创建链接文件
+```
+
+step5: 从服务器开比密钥验证功能
+
+```shell
+include "/etc/tranfer.key"
+server 192.168.10.10
+{
+keys  {key master-slave; };
+}
+```
+
+step6: DNS 从服务器同步域名区域数据, 删除从服务器 DNS 数据 `/etc/named/slaves/*`，然后测试是否是否自动同步 DNS 数据。
+
+```shell
+systemctl restart named
+```
+
+
+
+###### DNS 缓存服务器
+
+一种不负责域名数据维护的 DNS 服务器. 简单的说，就是把用户经常用到的域名与 IP 地址的解析记录保存到本地，从而提升下次解析的效率。
+
+应用：一般用于经常访问某些固定站点，而且对这些网站的访问速度有较高要求的企业内网中，但实际的应用并不广泛。
+
+而且缓存服务器是否可以成功解析还与指定的上级 DNS 服务器的允许策略有关，了解即可。
+
+- 配置
+
+修改 BIND 服务的主配置文件 `/etc/named.conf`，增加 forwarders 参数
+
+```shell
+# 格式：forwarders {上级DNS服务器地址;};
+options {
+	forwarders {210.73.64.1; };
+};
+```
+
+ 
+
+###### 分离解析技术
+
+DNS 服务的分离解析功能，可以让处于不同地理位置范围内的读者访问相同的网址，但是从不同的服务器获取数据（不同的地理位置/国家分别架设 DNS 服务器）。
+
+- 配置
+
+step1: DNS 分离解析技术和 DNS 跟服务器功能冲突，需要删除
+
+```shell
+#删除：
+zone "." IN {
+	type hint;
+	file "named.ca";
+};
+```
+
+step2: 修改 “区域配置文件”，实现根据不同地理区域(例如：中国 & 美国)的 IP 分别加载不同的数据配置文件 linuxprobe.com.china & linuxprobe.com.america。当用户访问 linuxprobe.com 时，便会按照不同的数据配置文件找到该区域对应的服务器。
+
+`/etc/named.rf1912.zones`
+
+```shell
+# 使用 acl 参数定义变量 china & america
+acl "china" {127.71.115.0/24; };
+acl "america" {106.185.25.0/24};
+
+view "china" {
+	match-clients {"china"; };
+	zone "linuxprobe.com" {
+		type master;
+		file "linuxprobe.com.china"
+	};
+};
+
+view "america" {
+	match-clients {"america"; };
+	zone "linuxprobe.com" {
+		type master;
+		file "linuxprobe.com.america"
+	};
+};
+```
+
+step3: 修改 “数据配置文件”， 通过模板创建 数据配置文件 linuxprobe.com.china & linuxprobe.com.america
+
+`/etc/named/ linuxprobe.com.china `
+
+```shell
+@       IN      SOA     linuxprobe.com. root.linuxprobe.com. (
+                              2023041501 ; Serial
+                              3600       ; Refresh
+                              1800       ; Retry
+                              604800     ; Expire
+                              86400      ; Minimum TTL
+                        )
+        IN      NS      ns.linuxprobe.com.
+ns		IN      A     	122.71.115.10
+www		IN		A		122.71.115.15
+```
+
+`/etc/named/ linuxprobe.com.america `
+
+```shell
+@       IN      SOA     linuxprobe.com. root.linuxprobe.com. (
+                              2023041501 ; Serial
+                              3600       ; Refresh
+                              1800       ; Retry
+                              604800     ; Expire
+                              86400      ; Minimum TTL
+                        )
+        IN      NS      ns.linuxprobe.com.
+ns		IN      A     	106.85.25.10
+www		IN		A		106.85.25.15
+```
+
+step4: 测试，将客户主机的 IP 分别修改为： 122.71.15.1 与 106.185.25.，并修改 DNS server 地址为两个不同 ip 的服务主机 ip，使用 `nslookup` 测试
+
+```shell
+nslookup
+```
+
 
 
 #### ch14 使用 DHCP 动态管理主机地址
+
+主要用于自动管理**局域网内主机**的 IP 地址，子网掩码，网关地址，DNS 地址等参数。
+
+**DHCP 的设计初衷就是为了更高效的集中管理局域网中的 IP 地址资源，而且当客户端的租约时间到期后还可以自动回收已分配的 IP 地址，以便交给新加入的客户端。**
+
+```shell
+apt-get install dhcpd # CentOS
+apt-get install isc-dhcp-server
+```
+
+租约：DHCP 客户端能够使用动态分配的 IP 的时间
+
+预约：保证网络中特定的设备（MAC）总是获取到固定的 IP 地址;
+
+- **客户端主机通过 DHCP 获取 IP 流程解析：**
+
+1. DISCOVER: 客户端广播 DHCP 请求
+2. OFFER: 服务端回复 DHCP offer，其中包含分配给客户端主机的 IP, gatewat, netmask, DNS, lease time 等信息
+3. REQUEST: 客户端广播发送 DHCP request 报文，其中包括 IP, gatewat, netmask, DNS, lease time 等信息
+4. ACK: 对应的服务端回复 DHCP ACK，
+
+https://blog.csdn.net/qq_51544942/article/details/124926120
+
+
+
+- 配置参数 `/etc/dhcp/dhcpd.conf`
+
+例子：
+
+```shell
+#一个标准的配置文件应该包括:全局配置参数，子网网段声明，地址配置选项，以及地址配置参数
+ddns-update-style interim; # 全局配置参数
+ignore client-updates;
+
+# 子网网段声明
+subnet 192.168.10.0 netmask {
+	# 地址配置选项
+	option routers 192.168.10.1;
+	option subnet-mask 255.255.255.0;
+	#地址配置参数
+	default-lease-time 21600;
+	max-lease-time 43200;
+}
+```
+
+参数说明：
+
+```shell
+ddns-update-style [类型] # 定义 DNS 服务动态更新的类型，类型包括：none(不支持动态更新)，interim(互动更新模式),ad(特殊更新模式)
+[allow]|[ignore] client-updates # 允许/忽略客户端更新 DNS 记录
+default-lease-time [21600] # 默认超时时间
+option domain-name-servers [8.8.8.8] # 定义 DNS 服务器地址，8.8.8.8 为谷歌公开的 DNS 服务器地址，稳定性好，硬件设备多
+option domain-name ["domain.org"] # 定义 DNS 域名
+range # 用于分配的 IP 地址池
+option subnet-mask # 定义客户端的子网掩码
+option routers # 定义客户端的网关地址
+broadcast-address [address] # 定义客户端的广播地址
+ntp-server [address] # 定义客户端的网络时间服务器
+nis-servers [address] # 定义客户端的 NIS 服务器地址
+Hardware [网卡物理地址] # 定义网卡接口的类型与 MAC 地址
+server-name [hostname] # 想 DHCP 客户端通知服务端的主机名
+fixed-address [address] # 将某个固定的 ip 分配给制定的主机
+time-offset [offset] # 制定客户端与格林尼至时间的偏移差
+```
+
+需要关闭虚拟机软件自带的 DHCP 服务，为了避免与自己配置的 dhcpd 服务程序发生冲突，应该先关闭：“编辑” -> “虚拟机网络管理”
+
+```shell
+ddns-update-style none;
+ignore client-updates;
+subnet 192.168.10.0 netmask 255.255.255.0 {
+	range 192.168.10.50 192.168.10.150;
+	option subnet-mask 255.255.255.0;
+	option routers 192.168.10.1;
+	option domain-name "linuxprobe.com"
+	option domain-namer-servers 192.168.10.1;
+	default-lease-time 21600;
+	max-lease-time 43200;
+}
+
+# 重启服务, 
+systemctl restart isc-dhcp-server
+systemctl enable isc-dhcp-server # 开机自动开启
+
+# TODO: 服务启动失败，提示配置问题
+Oct 25 22:15:22 ubuntu sh[7056]: exiting.
+Oct 25 22:15:22 ubuntu systemd[1]: isc-dhcp-server.service: Main process exited, code=exited, status=1/FAILURE
+Oct 25 22:15:22 ubuntu systemd[1]: isc-dhcp-server.service: Unit entered failed state.
+Oct 25 22:15:22 ubuntu systemd[1]: isc-dhcp-server.service: Failed with result 'exit-code'.
+root@ubuntu:/etc/dhcp# systemctl status isc-dhcp-server
+● isc-dhcp-server.service - ISC DHCP IPv4 server
+   Loaded: loaded (/lib/systemd/system/isc-dhcp-server.service; enabled; vendor preset: enabled)
+   Active: failed (Result: exit-code) since Sat 2025-10-25 22:15:22 CST; 1min 9s ago
+     Docs: man:dhcpd(8)
+  Process: 7056 ExecStart=/bin/sh -ec      CONFIG_FILE=/etc/dhcp/dhcpd.conf;      if [ -f /etc/ltsp/dhcpd.conf ]; then CONFIG_FILE=/etc/ltsp/dhcpd.conf; fi;      [ -e /var
+ Main PID: 7056 (code=exited, status=1/FAILURE)
+
+Oct 25 22:15:22 ubuntu sh[7056]: Configuration file errors encountered -- exiting
+Oct 25 22:15:22 ubuntu sh[7056]: If you think you have received this message due to a bug rather
+Oct 25 22:15:22 ubuntu sh[7056]: than a configuration issue please read the section on submitting
+Oct 25 22:15:22 ubuntu sh[7056]: bugs on either our web page at www.isc.org or in the README file
+Oct 25 22:15:22 ubuntu sh[7056]: before submitting a bug.  These pages explain the proper
+Oct 25 22:15:22 ubuntu sh[7056]: process and the information we find helpful for debugging..
+Oct 25 22:15:22 ubuntu sh[7056]: exiting.
+Oct 25 22:15:22 ubuntu systemd[1]: isc-dhcp-server.service: Main process exited, code=exited, status=1/FAILURE
+Oct 25 22:15:22 ubuntu systemd[1]: isc-dhcp-server.service: Unit entered failed state.
+Oct 25 22:15:22 ubuntu systemd[1]: isc-dhcp-server.service: Failed with result 'exit-code'.
+root@ubuntu:/etc/dhcp#  vi dhcpd.conf
+
+```
+
+##### 分配固定 IP
+
+把 IP 地址和主机网卡的 MAC 地址绑定，既可以实现该主机一直获取到固定 IP 的功能。
+
+配置参数 `/etc/dhcp/dhcpd.conf`
+
+```shell
+# 为这一台主机分配固定的 IP
+host linuxprobe {
+	hardware ethernet 00:0c:29:27:c6:12;
+	fixed-address 192.168.10.88;
+}
+```
+
+然后重启服务即可。
+
+**TODO: 需要使用客户机测试 DHCP 功能，本地只需要保证 DHCP 服务运行正常即可**
 
 
 
 #### ch15 使用 Postfix 与 Dovecot 部署邮件服务
 
+电子邮件系统，可以让用户在离线的情况下完成数据的收，发。
+
+
+
+常见的邮件协议
+
+- 简单邮件传输协议(SMTP， Simple Mail Transfer Protocol)：用于发送和中转发出的电子邮件，使用 TCP 25 端口
+- 邮局协议v3(POP3， Post Office Protocol 3): 用于将电子邮件存储到本地主机，占用服务器的 TCP 110 端口
+- 网络消息访问协议（IMCP4，Internet Message Access Protocol 4）:用于在本地主机上访问邮件，使用TCP 110 端口
+
+角色：
+
+- 邮件用户代理(MUA，Mail User Agent)：为用户收，发邮件的服务器
+- 邮件投递代理（MDA，Miail Delivery Agent）:用于保存用户邮件的“信箱”服务器，负责将来自 邮件传输代理（MTA, Mail Transfer Agent）的邮件保存到本地的收件箱中;
+
+
+
+###### Postfix
+
+基于 SMTP 协议的服务程序，提供发邮件服务功能。IBM 自主研发的免费开源电子邮件服务程序，能够很好的兼容 Sendmail 服务程序，收发能力强于 Sendmail 服务程序。
+
+```shell
+apt-get install postfix # RHEL7 默认是安装的
+systemctl enable postfix # 开机自启动
+systemctl status postfix
+```
+
+
+
+###### Dovecot
+
+基于 POP3 协议或 IMAP 协议的服务程序，提供收邮件功能。开源服务程序。
+
+```shell
+#yum install dovecot
+
+root@ubuntu:/etc/postfix#  apt-get install dovecot-
+dovecot-antispam         dovecot-dev              dovecot-ldap             dovecot-managesieved     dovecot-pgsql            dovecot-solr             
+dovecot-core             dovecot-gssapi           dovecot-lmtpd            dovecot-metadata-plugin  dovecot-pop3d            dovecot-sqlite           
+dovecot-dbg              dovecot-imapd            dovecot-lucene           dovecot-mysql            dovecot-sieve    
+
+sudo apt install dovecot-core dovecot-imapd dovecot-lmtpd dovecot-mysql dovecot-pgsql dovecot-pop3d # 这个命令会安装Dovecot的核心组件以及IMAP、LMTP和POP3服务，同时还会安装MySQL和PostgreSQL的支持模块。
+systemctl status dovecot
+systemctl enable dovecot
+```
+
+
+
+- mail -  mail.mailutils - process mail messages
+
+在 Linux 服务端，可以通过 mail 命令管理/查看邮件
+
+
+
+```shell
+root@ubuntu:/etc/dovecot/conf.d#  mail 
+No mail for root
+
+-s	给邮件追加主题
+-a	发送邮件附件，多个附件使用多次-a选项即可
+-b	指定密件抄送的收信人地址
+-c	指定抄送的收信人地址
+```
+
+
+
+
+
+###### Outlook/Foxmail 等客户端软件
+
+供用户使用的邮件客户端软件。
+
+
+
+###### 配置邮件服务器
+
+要想检验电子邮件系统的配置效果，需要先部署 BIND 服务程序，为电子邮件服务器和客户端提供 DNS 域名解析服务
+
+- 配置 BIND 域名解析服务
+
+step1：配置服务器主机名称，需要保证服务器主机名称和发信域名一致
+
+```shell
+vi /etc/hostname
+mail.linuxprobe.com
+```
+
+step2: 清空防火墙
+
+```sh
+iptables -F
+service iptables save
+```
+
+step3: 为电子邮件系统提供域名解析，修改“主配置文件”， “区域配置文件”以及“数据配置文件”
+
+```shell
+vi /etc/named/named.conf
+
+# 数据配置文件
+$TTL 1D
+ns		IN		A			192.168.10.10
+@		IN 		MX 10		mail.linuxprobe.com
+mail	IN		A			192.168.10.10
+```
+
+- 配置 Postfix 服务程序，配置文件 `/etc/postfix/main.cf` 
+
+```shell
+myhostname # 邮局系统的主机名
+mydomain # 邮局系统的域名
+myorigin # 从本机发出的邮件的域名名称
+inet_interfaces # 监听的网卡接口
+mydestination # 可接收邮件的主机名或域名
+mynetworks # 设置可转发哪些主机的邮件
+relay_domains # 设置可转发哪些网域的邮件·
+```
+
+修改：
+
+```shell
+myhostname=mail.linuxprobe.com
+mydomain=linuxprobe.com
+myorigin=$mydomain
+inet_interfaces=all
+mydestination=$myhostname,$mydomain
+```
+
+step2: 创建电子邮件系统的登录帐号，Postfix 与 vsftpd 一样，都可以使用本地系统的账户和密码，因此在本地系统创建常规账户即可。
+
+```shell
+useradd boss
+echo "linuxprobe" | passwd --stdin boss
+systemctl restart postfix
+```
+
+- 配置 dovecot 服务程序，`/etc/dovecot/dovecot.conf`
+
+Dovecot 服务程序为了保证电子邮件系统的安全，默认强制用户使用加密方式登录，而由于当前没有加密系统，因此需要添加该参数来允许用户明文登录
+
+```shell
+protocols = imap pop3 lmtp
+disable_plaintext_auth = no # 允许明文登录
+login_trusted_networks=192.168.0.0/24 # 仅允许该网段的用户使用邮箱服务
+```
+
+配置邮件格式与存储路径 `/etc/dovecot/config.d.10-mail.conf`
+
+```shell
+mail_location=mbox:~/mail:INBOX=/var/mail/%u
+```
+
+重启服务
+
+```shell
+systemctl restart dovecot
+systemctl enable dovecot
+```
+
+- 使用 windows outlook 客户端软件测试电子邮件系统
+
+1. 需要修改客户端主机的 DNS 服务器地址
+
+2. outlook 软件默认会通过 SSL 加密协议尝试登录电子邮件服务，失败后点击“下一步” 即可让 Outlook 软件通过非加密的方式验证登录。
+
+###### 设置用户别名邮箱
+
+- aliases - Postfix local alias database format
+
+更新完 /etc/alias 文件后，需要执行`newaliases` 命令，让新的用户别名生效
+
+```shell
+abcd:root # 生效后发往 abcd@linuxprobe.com 的邮件 root 可以收到
+
+mail
+```
+
+
+
 
 
 #### ch16 使用 Squid 部署代理缓存服务
+
+
 
 
 
