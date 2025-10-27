@@ -4918,6 +4918,149 @@ mail
 
 
 
+###### 代理缓存服务
+
+- 正向代理：一般用在企业局域网中，让企业用户统一通过 Squid 服务访问互联网资源，这样不仅可以在一定程度上减少公网带宽的开销，而且还能对用户访问的网站内容进行监管限制，一旦内网用户访问的网站内容与禁止规则匹配，就会自动屏蔽。
+- 反向代理：一般为大中型网站提供缓存服务。他把网站的静态资源保存在多个节点机房中，当有用户访问静态资源时，可以就近为用户分配节点并传输资源，因此在大中型网站中普遍应用。
+
+```shell
+yum install squid # ubuntu
+apt-get install squid # Debian
+systemctl status squid
+systemctl enable squid # 开机自启动
+```
+
+- 配置文件：
+
+```shell
+http_port_3128 # 监听的端口号
+cache_mem 64M # 内存缓冲区的大小
+chche_dir ufs /var/spool/squid 2000 16 256 # 硬盘缓冲区的大小
+cache_effective_user squid # 设置缓存的有效用户
+cache_effective_group squid # 设置缓存的有效用户组
+dns_nameservers [IP] # 用于设置默认的 DNS 地址，一般不设置
+cache_access_log /var/log/access.log # 访问日志文件的保存路径
+cache_log /var/log/squid/cache.log # 缓存日志文件的吧村路径
+visible_hostname linuxprobe.com	#squid 服务器的名称
+```
+
+###### 正向代理
+
+###### 标准正向代理
+
+浏览器设置代理服务器以及端口即可。
+
+设置 -> 工具 -> Internet 选项 -> 局域网设置 -> "为局域网使用代理服务器"
+
+为了避免其他人蹭网，可以修改代理服务器的端口号。
+
+- ACL 访问控制：
+
+修改配置文件后，需要重启服务
+
+```shell
+systemctl restart squid # 重启服务
+```
+
+
+
+测试1：仅允许 192.168.10.20 的用户通过 squid 访问网络，修改配置文件 `/etc/squid/squid.conf`
+
+```shell
+acl client src 192.168.10.20 # 允许该用户访问 squid
+http_access allow client
+http_access deny all # 默认拒绝所有人访问
+```
+
+测试2：禁止所有客户端访问网址中包含 linux 关键字的网站。
+
+```shell
+acl deny_keyword url_regex -i linux # deny_keyword 的别名， 网址中包含 "linux" 关键字就不行
+http_access deny deny_keyword # 拒绝访问
+```
+
+测试3：禁止所有客户端访问某个特定的网站
+
+```shell
+acl deny_url url_regex http://www.linuxcool.com # 定义拒绝访问的 URL 的别名
+http_access deny deny_url # 拒绝访问
+```
+
+测试4：禁止员工在企业网内部下载带有某些后缀的文件
+
+```shell
+acl badfile urlpath_regex -i \.rar$ \.avi$ # 禁止的文件类型
+http_access deny badfile
+```
+
+######  透明正向代理
+
+用户不需要在浏览器设置代理服务器地址，端口等信息，**而是由 DHCP 服务器将网络信息分配给客户端软件**。这样用户使用浏览器的时候就会自动使用代理了。
+
+所有客户主机对 80 端口（网站）的请求都经过转发，最终通过 Squid 服务程序访问。
+
+1. 不像标准正向代理，不需要用户手动设置，
+
+2. 可以更隐蔽的监视用户的行为
+
+要解决的问题： 
+
+1. 内网用户需要通过 DNS 获取到要访问网址的 IP;
+2. 
+
+
+
+实现方法:
+
+step1:借助 SNAT 技术，iptables 将内网中主机的 53 端口的请求转发到 Squid 服务器，并且允许 Squid 服务器转发 Ipv4 数据包。这时候内网中主机已经可以获取到 ip 了，
+
+```shell
+iptables -F
+iptables -t nat -A POSTROUTING -p udp --dport 53 -o eno33554968 -j MASQUERADE
+echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+sysctl -p # 让转发参数立即生效
+```
+
+step2: 修改 Squid 服务器配置文件, `/etc/squid/squid.conf`
+
+```shell
+http_port 3128 transprent # squid 3128 端口的数据透明代理
+# uncomment and adjust the following to add a disk cache directory.
+cache_dir ufs /var/spool/squid 100 16 256
+
+squid -k parse # 检查 Squid 配置文件是否有错误
+squid -z # 初始化 Squid 的透明代理技术
+systemctl restart squid
+```
+
+step3: 用户主机 80 端口上的所有数据转发到 Squid 服务器本地的 3128 端口
+
+```shell
+iptables -t nat -A PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 3128
+iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -o en033554968 -j SNAT --to 桥接网卡ip地址
+service iptables save
+```
+
+
+
+###### 反向代理
+
+网页内容由于动态资源以及大量的静态资源（视频，图像，CSS 等）组成。
+
+反向代理是将大量静态资源抽离出去，在全国各地部署资源缓存节点，好处：1.提高访问速度; 2.降低服务器负载;
+
+
+
+###### CDN 内容分发网络
+
+TODO:
+
+
+
+###### 网站的防护功能
+
+防护插件
+
 
 
 #### ch17 使用 iSCSI 服务部署网络存储
