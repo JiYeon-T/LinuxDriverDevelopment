@@ -5,10 +5,24 @@
 写一个关闭笔记本 touchpad 的脚本,放到开机文件里/手动执行
 
 - openssl
-
 - tcpdump 抓包看下， FTP/TFTP 是明文传输, ssh 是加密传输
+- ch18, 本地本来是 MySQL 数据库，里面保存了一些数据。安装 MariaDB 后数据被迁移到了 /var/lib/mysql-5.7 目录，需要想办法恢复数据并迁移到 MariaDB 中
+
+#### 扩展:
+
+TODO:
+
+- awk 脚本
+
+```shell
+awk # 也可以用于 shell 字符串操作
+```
 
 
+
+- sed
+
+  
 
 
 
@@ -154,6 +168,31 @@ apt-key adv --help # advanced operation
 sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80  --refresh-keys
 sudo apt-get update
 ```
+
+- ubuntu/debain 配置 apt 清华源/阿里源
+
+https://mirrors.tuna.tsinghua.edu.cn/
+
+https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/
+
+修改配置文件 `etc/apt/sources.list`
+
+```shell
+#添加清华源或阿里源
+```
+
+如果遇到无法访问的问题 ，可以在清华源Debian使用帮助中发现
+
+如果遇到无法拉取 https 源的情况，请先使用 http 源并安装： 
+
+ `sudo apt install apt-transport-https ca-certificates`
+这里直接将 `/etc/apt/sources.list` 中的 `https` 改为 `http`， 然后先 `sudo apt update`再使用执行清华源Debian使用帮助中的命令，再改回https即可
+
+
+
+TODO
+
+ca-certificates 包的使用方法。
 
 
 
@@ -559,6 +598,16 @@ TODO:
 ```shell
 strace ls
 ```
+
+
+
+- 查看当前使用的 ubuntu 版本
+
+```shell
+cat /etc/os-release
+```
+
+
 
 
 
@@ -5065,33 +5114,409 @@ TODO:
 
 #### ch17 使用 iSCSI 服务部署网络存储
 
+当前的磁盘硬件接口类型主要有：
+
+IDE ： 成熟稳定，价格便宜的并行传输接口
+
+SATA: 传输速度更快，数据校验更完整的串行传输接口
+
+SCSI：一种用于计算机和硬盘，光驱等设备之间系统接口的通用标准，具有系统资源占用率低，转速高，传输速度快等优点。
+
+
+
+###### iSCSI 
+
+ Internet Small Computer Systemr Interface, 互联网小型计算机系统接口，
+
+将因特网与 SCSI 接口结合的新型存储技术，可以用来在网络中传输 SCSI 接口的命令和数据。
+
+客户机：SCSI 命令 & 数据打包成 TCP/IP 数据包，通过 以太网发送
+
+服务器：收到 TCP/IP 数据包后，解压为 SCSI 命令 & 数据，发给磁盘硬件
+
+- 为了保证网络存储资源的可用性与稳定性，同样需要使用 RAID 
+
+```shell
+mdadm -Cv /dev/md0 -n 3 -l 5 -x 1 /dev/sdb /sdev/sdc /dev/sdd /dev/sde
+-Cv # 创建阵列并显示过程
+-n 3 # 创建 RADID5 需要的磁盘个数
+-l 5 # RAID 磁盘阵列的级别
+-x 1 # 磁盘阵列的备份盘个数
+mdadm -D /dev/md0 # 查看设备的详细信息
+```
+
+将该磁盘阵列设置为开机自动挂载
+
+```shell
+# /etc/fstab
+```
+
+- 配置 iSCSI 服务端
+
+```shell
+#yum install targetd targetcli
+apt-get install tgt targetcli # iSCSI 服务端
+apt-get install open-iscsi # iSCSI 客户端
+systemctl status tgt # 查看状态
+systemctl enable tgt # 开机子启动
+```
+
+- targetcli - targetcli 是用于管理 iSCSI 服务端存储资源的专用配置命令，它能够提供类似与 fdisk 命令的交互式配置功能，将iSCSI 共享资源的配置内容抽象成目录形式。
+
+```shell
+targetcli
+ls
+cd /backstores/block
+create disk0 /dev/md0 # 将创建的 RAID5 磁盘阵列重命名为 disk0
+```
+
+- 设置访问控制列表，iSCSI 协议是通过客户端名称进行验证的，也就是说，用户在访问存储共享资源时不需要输入密码，只要 iSCSI 客户端的名称与服务端设置的访问控制列表中的某一个条目一致即可
+
+```shell
+cd acls
+create xxx:client # xxx 为生成 iSCSI target 时生成的
+```
+
+- 设置 iSCSI 服务器监听的端口以及 IP
+
+```shell
+cd portals
+create 192.168.10.10
+exit # 保存配置到文件
+```
+
+- 设置防火墙并重启服务
+
+```shell
+systemctl restart tgt
+```
+
+
+
+##### iSCSI 客户端
+
+- Linux 客户端
+
+
+
+- windows 客户端
+
+
+
 
 
 #### ch18 使用 MariaDB 数据库管理系统
+
+MySQL 被 Oracle 收购后，逐渐由开源 -> 闭源;
+
+-> MariaDB 新的开源数据库。
+
+
+
+###### MySQL
+
+- MySQL 数据库有提供性能测试数据集
+
+TODO:
+
+https://cloud.tencent.com/developer/article/2397972
+
+
+
+###### MariaDB
+
+```shell
+yum install mariadb mariadb-server  # CentOS
+apt-get install mariadb-server mariadb-client # 
+
+qz@ubuntu:~/code/LinuxDriverDevelopment$ apt-get install mariadb-
+mariadb-client            mariadb-client-core-10.0  mariadb-plugin-connect    mariadb-plugin-oqgraph    mariadb-plugin-tokudb     mariadb-server-10.0       mariadb-test
+mariadb-client-10.0       mariadb-common            mariadb-plugin-mroonga    mariadb-plugin-spider     mariadb-server            mariadb-server-core-10.0  mariadb-test-data
+```
+
+
+
+- MySQL 存在的情况下安装 MariaDB， 
+
+  TODO: 数据被迁移了，
+
+  MySQL 数据库中的内容如何迁移到 MaridDB
+
+  https://blog.csdn.net/lihaiming_2008/article/details/148783286
+
+  ```shell
+  mysqldump -u [username] -p[password] [database_name] > database_backup.sql
+  # MySQL 已经被卸载了，如果要恢复可能要卸载 MaridDB 再安装 MySQL 然后恢复?
+  ```
+
+  
+
+  ​        │                                                                                                                                                                                │ 
+  ​        │ The old data directory will be saved at new location.                                                                                                                          │ 
+  ​        │                                                                                                                                                                                │ 
+  ​        │ A file named **/var/lib/mysql/debian-*.flag** exists on this system. The number indicated a database binary format version that cannot automatically be upgraded (or downgraded).  │ 
+  ​        │                                                                                                                                                                                │ 
+  ​        │ Therefore the previous data directory will be renamed to **/var/lib/mysql-*** and a new data directory will be initialized a**t /var/lib/mysql**.                                      │ 
+  ​        │                                                                                                                                                                                │ 
+  ​        │ Please manually export/import your data (e.g. with mysqldump) if needed.  
+
+
+
+- **MariaDB 数据库软件程序安装完毕并成功启动后不要立即启动。** 为了确保数据库的安全性以及正常运转，需要先对数据库程序进行初始化操作，这个操作涉及：
+
+1. 设置 root 管理员在数据库中的密码值;
+2. 设置 root 管理员在数据库中的专有密码;
+3. 随后删除匿名账户，并使用 root 管理员从远程登录数据库，以确保数据库上运行的业务的安全性
+4. 删除默认的测试数据库，取消测试数据库的一系列访问权限;
+5. 刷新授权列表，让初始化的设定立即生效
+
+```shell
+mysql_secure_installation
+# 
+#All done!  If you've completed all of the above steps, your MariaDB
+#installation should now be secure.
+
+# Thanks for using MariaDB!
+
+```
+
+- 设置防火墙，允许 3306 端口， mysql
+
+```shell
+firewall-cmd --permanent --add-service=mysql # firewall 中叫 mysql
+firewall-cmd --reload
+
+root@ubuntu:/etc/mysql#  cat /etc/services  | grep 3306
+mysql		3306/tcp
+mysql		3306/udp
+```
+
+- 设置 root 密码
+
+```shell
+mysql -u root -p
+SHOW databases; # 显示所有数据库
+SET password = PASSWORD('000') # 修改密码为:linuxpobe, 修改密码不生效
+# SET PASSWORD FOR 'username'@'hostname' = PASSWORD('000');
+SET PASSWORD FOR 'linuxprobe'@'localhost' = PASSWORD('000');
+```
+
+- 管理账户以及授权 - 可能需要通过其他身份/同事登录数据库进行维护，
+
+```shell
+CREATE USER linuxpobe@localhost IDENTIFIED BY '000'; # 创建新用户, 没有任何权限
+# GRANT 命令授予某个用户对某个表格的特定权限
+GRANT SELECT,UPDATE,DELETE,INSERT ON mysql.user TO linuxprobe@localhost;
+SHOW GRANTS FOR linuxprobe@localhost; # 查看权限
+# REVOKE 移除授权
+```
+
+- 创建数据库与表单
+
+```mysql
+CREATE DATABASE <database_name>; #创建新的数据库
+DESCRIBE <table_name>; # 描述数据表,显示其中的数据类型,主键等信息
+UPDATE <table_name> SET attribute=新值 WHERE attribute>原始值 # 更新表单中的数据
+USE <database_name> # 指定使用的数据库
+SHOW databases; # 显示当前所有的数据库
+SELECT * FROM <table_name> # 从数据表中选择某个记录值
+DELETE FROM <table_name> WHERE attribute=<value> # 从表单中删除某个记录值
+```
+
+- 管理表单以及数据——增，删，改，查
+
+```shell
+INSERT # 插入
+UPDATE # 修改
+DELETE # 删除
+SELECT * FROM mybook WHERE price!=80;
+```
+
+- 数据库的每份与恢复
+
+`mysqldump` 命令用于备份数据库为一个文件
+
+```shell
+mysqldump -u root -p linuxprobe > /xxxDB.dump
+DROP DATABASE linuxprobe # 删除数据库
+CREATE DATABASE linuxprobe;
+mysql -u root -p linuxprobe < /xxxDB.dump # 从备份的数据库文件恢复数据库
+```
+
+
 
 
 
 #### ch19 使用 PXE + Kickstart 无人值守安装服务
 
+为还没有操作系统的主机安装 Linux 操作系统，不需要一台一台手动安装——批量安装。 
+
+PXE + TFTP + FTP + DHCP + Kickstart 实现。
 
 
-#### ch20 使用 LNMP 架构部署动态网站环境
+
+客户端： -> 无人值守系统
+
+1. 请求分配网卡 IP 地址
+2. 请求获取引导文件
+3. 请求下载应答文件
+
+###### PXE
+
+Preboot eXecute Enviroment, 预启动执行系统，是由 Intel 开发的技术，可以让计算机通过网络来安装操作系统(前提是计算机上的网卡支持 **PXE ** 技术)，主要用于在无人值守安装系统中引导客户端主机安装操作系统。
 
 
 
-#### 扩展:
+###### Kickstart
 
-TODO:
+一种无人值守的安装方式，工作原理是把原来需要运维人员手动输入的参数保存成一个 `ks.cfg` 文件，安装过程中自动匹配 Kickstart 生成的文件。其中包含了所有需要的参数，因此不需要人员干预，
 
-- awk 脚本
+
+
+###### 部署"无人值守安装系统"服务程序
+
+- DHCP
+
+客户端主机需要关闭虚拟机自带的 DHCP 服务（ 虚拟机上取消勾选 “使用本地 DHCP 服务将 IP 地址分配给虚拟机”）
+
+DHCP 服务程序修改配置文件 `/etc/dhcp/dhcpd.conf`，让客户端主机获取到 ip 后就主动获取引导驱动文件
+
+1. 允许 BOOTP 引导程序协议，旨在让局域网内暂时没有操作系统的主机也可以获取到 静态 IP 地址;
+2. 在配置文件的最下面加载了引导驱动 "pxelinux.0" (该文件后续会创建的)
 
 ```shell
-awk # 也可以用于 shell 字符串操作
+allow booting;
+allow bootp;
+subnet 192.168.0.0 netmask 255.255.255.0 {
+	# 省略若干配置
+	filename "pxelinux.0";
+};
+
+systemctl restart dhcpd;
+systemctl enable dhcpd;
+```
+
+- TFTP
+
+TFTP 基于 UDP 的简单文件传输协议，不需要用户认证既可以使用。对于还没有操作系统的客户机使用刚好。
+
+客户机通过 TFTP 获取引导以及驱动文件。
+
+当客户机有了基本的驱动程序以后，再通过 vsftpd 服务程序获取完整的光盘镜像。
+
+```shell
+# TFTP 通过 xinetd 实现
+vi /etc/xinetd.d/tftp
+
+service tftp {
+	server 				= /usr/sbin/in.tftpd
+	server_args			= /var/lib/tftpboot
+	disable				= no
+}
+```
+
+注意打开防火墙，TFTP 使用 UDP 69 端口
+
+- SYSLinux 服务程序
+
+TODO: 需要好好研究一下
+
+syslinux - install the SYSLINUX bootloader on a FAT filesystem
+
+```shell
+man syslinux
 ```
 
 
 
-- sed
+一个用于提供引导加载的服务程序， `/usr/share/syslinux` 目录中会出现很多引导文件
 
-  
+```shell
+apt-get install syslinux
+man syslinux
+# 将需要的引导程序拷贝到 TFTP 的默认目录中
+cp /usr/share/syslinux/pxelinux.0 /var/lib/tftpboot
+cp /media/cdrom/images/pxeboot/{vmlinuz,initrd.img} /var/lib/tftpboot # 光盘中保存的镜像文件
+cp /media/cdrom/isolinux/{vesamenu,boot.msg} /var/lib/tftpboot
+
+mkdir pxelinux.cfg # 创建 PXE linux 文件夹
+
+```
+
+
+
+**增加 default 文件，开机后默认会执行的操作，将默认的光盘镜像安装方式改为 FTP 文件传输方式，并制定好光盘镜像的获取网址以及 Kickstart 应答文件的获取路径**
+
+```shell
+default linux
+append initrd=initrd.img inst.stage2=ftp://192.168.10.10 ks=ftp://192.168.10.10/pub/ks.cfg quiet
+```
+
+- 配置 vsftpd 服务程序
+
+光盘镜像是通过 FTP 传输的，因此需要用到 vsftpd.
+
+也可以通过 HTTP 协议传输，配置 httpd 即可。
+
+在确保光盘镜像已经挂在到 `/media/cdrom `后， 把目录中的镜像文件全部拷贝到 vsftpd 的工作目录中
+
+```shell
+cp -r /media/cdrom/* /var/ftp
+```
+
+
+
+- 创建 KickStart 应答文件
+
+上面的步骤实现了将镜像传输到客户机，
+
+Kickstart 应答文件中包含了系统安装过程中需要使用的选项和参数，系统可以自动掉取这个应答文件的内容，从而实现了无人值守安装系统。
+
+通过 Kickstart 应答文件 `ks.cfg`
+
+手动输入：
+
+```shell
+url --url=ftp://192.168.10.10
+# 省略其他参数
+```
+
+如果觉得配置参数太少，可以安装 kickstart 软件包通过 GUI 生成应答文件，然后将文件放到 `/var/ftp/pub` 目录即可
+
+```shell
+yum install system-config-kickstart
+apt-get install system-config-kickstart
+```
+
+
+
+#### ch20 使用 LNMP 架构部署动态网站环境
+
+- RPM 安装
+
+- 源码安装
+
+可以定制，其中用到了多个开源的库，都有必要学习一下
+
+- openssh
+
+
+
+- libpng...
+
+
+
+###### Linux
+
+
+
+###### MySQL
+
+
+
+###### Nignx
+
+
+
+###### PHP
 
