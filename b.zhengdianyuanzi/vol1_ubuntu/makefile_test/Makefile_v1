@@ -1,0 +1,26 @@
+
+
+#NOTE:shell command must start with TAB
+main:main.o calculate.o get_input.o
+	gcc main.o calculate.o get_input.o -o main
+
+#.o
+main.o:main.c
+	gcc -c main.c -o main.o
+
+get_input.o:get_input.c
+	gcc -c get_input.c
+
+calculate.o:calculate.c
+	gcc -c calculate.c
+
+
+
+.PHONY: clean
+
+
+clean:
+	@echo "cleaning"
+	rm -rf main
+	rm -rf *.o
+

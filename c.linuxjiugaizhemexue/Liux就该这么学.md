@@ -1,3 +1,5 @@
+
+
 ****
 
 # TODO:
@@ -20,9 +22,8 @@ awk # 也可以用于 shell 字符串操作
 
 
 
-- sed
+- sed 
 
-  
 
 
 
@@ -349,7 +350,6 @@ qz@qz:~/test$  sudo -i root
 qz@qz:~/test$ 
 qz@qz:~/test$ sudo -i # 切换到 root
 root@qz:~#  sudo --help
-
 ```
 
 
@@ -418,7 +418,7 @@ sudo apt install sosreport
 sosreport
 ```
 
-- passwd
+- passwd - 
 
 ```shell
 passwd --help
@@ -482,7 +482,6 @@ who -a # 会显示所有终端信息
 
 # 查到有终端使用 agettty 命令创建的????
 root     10371  0.0  0.0  17676  1812 tty6     Ss+  00:42   0:00 /sbin/agetty --noclear tty6 linux
-
 ```
 
 - genromfs - create a romfs image
@@ -525,14 +524,15 @@ at
 at 23:30 # 设置执行时间
 at -l # 查看所有周期性执行的任务
 atrm 序号 # 删除任务
-
 ```
 
 - cron - 周期性的执行任务
 
 Linux 系统默认启动的 crond 服务, 专门用于周期性的有计划的执行某一个具体的任务
 
-注意点:1. cron 中的命令都必须添绝对路径, 不知道的可以使用 `whereis` 命令查找
+注意点:
+
+1. cron 中的命令都必须添绝对路径, 不知道的可以使用 `whereis` 命令查找
 
 2. cron 配置文件中可以用 # 添加注释;
 3. cron 执行周期中的"分"必须指定,不能为空. 星期和日不能同时指定,否则可能冲突
@@ -576,7 +576,7 @@ pmap -x processname
 
 ```
 
-- ​       lsof - list open files
+-  lsof - list open files
 
 列出打开该文件的进程信息
 
@@ -775,6 +775,8 @@ file --help
 file /test.cpp
 ```
 
+
+
 ---
 
 ###### 打包压缩与搜索命令
@@ -782,7 +784,7 @@ file /test.cpp
 - tar - 打包/压缩/解压	
 
 ```shell
-tar -czvf test.tar.gz  /etc # 压缩到 test.tar.gz
+tar -czvf test.tar.gz /etc # 压缩到 test.tar.gz
 tar -xzvf test.tar.gz -C /test2 # 解压到 test2 目录
 # -c 创建压缩文件
 # -C 指定解压到的目录
@@ -858,7 +860,7 @@ find . -type f -exec cp -a {} ./temp \; # 后面好像只能跟一条测试命�
 
 - realpath - 打印文件的绝对路径
 
-```
+```shell
 realpath test.txt
 ```
 
@@ -986,7 +988,7 @@ wget 与 curl 的区别:
 
 wget 仅支持 http 协议.而 curl 支持很多协议, FTP, IMAP, SMTP...
 
-- mali - 发送邮件
+- mail - 发送邮件
 
 ```shell
 ```
@@ -1049,10 +1051,6 @@ https://blog.csdn.net/wzj_110/article/details/105715612
 TIMES=1
 let TIMES++ # 不许要加变量符号, $
 ```
-
-
-
-
 
 
 
@@ -1357,6 +1355,8 @@ export os=LINUX
 
 
 #### ch4 shell
+
+**NOTE:测试用例参考 4_shell 文件夹内的 shell 脚本**
 
 - vim
 

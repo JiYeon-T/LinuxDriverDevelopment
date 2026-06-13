@@ -1,0 +1,45 @@
+#define variables
+CC = gcc
+objs = main.o calculate.o get_input.o
+Q=@
+
+main: $(objs)
+	$(Q)echo "compiling"
+	$(Q)$(CC) -o main $(objs)
+
+
+main.o:main.c
+	$(Q)$(CC) -c main.c
+
+calculate.o:calculate.c
+	$(Q)$(CC) -c calculate.c
+
+get_input.o:get_input.c
+	$(Q)$(CC) -c get_input.c
+
+
+clean:
+	$(Q)echo "cleaning"
+	$(Q)rm -f $(objs)
+	$(Q)rm -f main
+
+
+######################### VARIABLE TEST #############################
+name = abc
+curname = $(name)
+#NOTE:curname will be assigned with the current value of $name which is 'abc', rather than the later value 'ABC' and It won't get changed.
+#curname := $(name)
+#curname = $(name)
+#NOTE:append
+curname += DEF
+name = ABC
+#NOTE:$name won't be assigned to a new value if It's already has a value.
+#name ?= ABC
+
+#test label, use with: `make print` command
+print:
+	@echo "name=$(name), curname=$(curname)"
+
+
+
+

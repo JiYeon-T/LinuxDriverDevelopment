@@ -1,10 +1,6 @@
 #!/bin/bash
 #shell example
 
-
-#脚本格式参考: /etc/bash.bashrc
-
-
 #eay shell script test
 #pwd
 #ls -al
