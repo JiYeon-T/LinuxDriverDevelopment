@@ -19,3 +19,15 @@ clean:
 	$(Q)rm -f $(objs)
 	$(Q)rm -f main
 
+############################ 条件判断 #########################
+git@github.com:JiYeon-T/makefile_practice.git
+
+
+
+
+
+
+
+
+########################### 函数 #############################
+git@github.com:JiYeon-T/makefile_practice.git
