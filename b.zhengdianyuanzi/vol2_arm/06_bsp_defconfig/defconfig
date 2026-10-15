@@ -1,0 +1,16 @@
+
+# Clock module initialization 
+CONFIG_BSP_CLK_ENABLE=y
+
+# enable delay API
+CONFIG_BSP_DELAY_ENABLE=y
+
+# led test
+CONFIG_BSP_LED_ENABLE=y
+
+# beep test
+CONFIG_BSP_BEEP_ENABLE=y
+
+# GPIO interrupt test
+CONFIG_BSP_INT_TEST_ENABLE=y
+

@@ -1,0 +1,373 @@
+一 map 文件中有什么?
+1. Memory Configuration(内存配置)
+显示链接脚本中定义的存储区域如 (Flash, RAM) 的其实地址和长度
+如:
+Name             Origin             Length             Attributes
+FLASH            0x08000000          0x00100000             xr
+RAM              0x20000000          0x00020000             xrw
+
+2.Linker Script and memory map(段映射)
+详细列出各个段起始地址，大小以及贡献这些段的 .o 文件
+Sections:
+.text - 代码段，保存在 flash 中
+.data - 已初始化的数据段，编译后保存在 flash 中; 运行时会动态加载到 RAM 中，
+.bss - 未初始化的/初始化为 0 的全局数据段, flash 中仅保存大小,因为值都是 0, 运行后会存放到 RAM 中, 仅占用 RAM 空间
+.rodata - 只读数据段，保存在 flash 中，例如：字符串或其他类型的常量
+如:
+.text           0x08000000          0x4000
+*(.text)
+.text           0x08000000          0x100 main.o
+.text           0x08000100          0x200 lib.a(func.o)
+
+3.Global Symbol Table(全局符号表)
+列出全局函数和变量的地址,大小以及所属文件。这对于定位变量地址或函数入口点非常有用。
+
+4.Discarded Sections(丢弃的段)
+如果使用了 --gc-sections, 这里会列出被链接器删除的未引用函数或数据段
+即代码里有但是最终的可执行文件里没有的部分
+
+
+二 为什么使用 Map 文件?
+1. 内存优化：查看哪些函数或变量占用了大量 Flash 或 RAM 空间
+2. 地址定位：在发生 HardFault 等 crash 时，通过报错地址在 Map 文件中查找对应的函数或代码行数
+3. 链接检查：确认变量是否被放置在了预期的内存区域（如将关键数据放入特定的 RAM 块）
+4. 重复定义排查： 帮助发现符号重复定义或链接顺序问题
+
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Linker script and memory map
+
+Address of section .text set to 0x87800000
+LOAD led.o
+                0x0000000000010000                PROVIDE (__executable_start, 0x10000)
+                0x0000000000010054                . = (0x10000 + SIZEOF_HEADERS)
+
+.interp
+ *(.interp)
+
+.note.gnu.build-id
+ *(.note.gnu.build-id)
+
+.hash
+ *(.hash)
+
+.gnu.hash
+ *(.gnu.hash)
+
+.dynsym
+ *(.dynsym)
+
+.dynstr
+ *(.dynstr)
+
+.gnu.version
+ *(.gnu.version)
+
+.gnu.version_d
+ *(.gnu.version_d)
+
+.gnu.version_r
+ *(.gnu.version_r)
+
+.rel.dyn        0x0000000000010054        0x0
+ *(.rel.init)
+ *(.rel.text .rel.text.* .rel.gnu.linkonce.t.*)
+ *(.rel.fini)
+ *(.rel.rodata .rel.rodata.* .rel.gnu.linkonce.r.*)
+ *(.rel.data.rel.ro .rel.data.rel.ro.* .rel.gnu.linkonce.d.rel.ro.*)
+ *(.rel.data .rel.data.* .rel.gnu.linkonce.d.*)
+ *(.rel.tdata .rel.tdata.* .rel.gnu.linkonce.td.*)
+ *(.rel.tbss .rel.tbss.* .rel.gnu.linkonce.tb.*)
+ *(.rel.ctors)
+ *(.rel.dtors)
+ *(.rel.got)
+ *(.rel.bss .rel.bss.* .rel.gnu.linkonce.b.*)
+                0x0000000000010054                PROVIDE (__rel_iplt_start, .)
+ *(.rel.iplt)
+ .rel.iplt      0x0000000000000000        0x0 led.o
+                0x0000000000010054                PROVIDE (__rel_iplt_end, .)
+
+.rela.dyn       0x0000000000010054        0x0
+ *(.rela.init)
+ *(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
+ *(.rela.fini)
+ *(.rela.rodata .rela.rodata.* .rela.gnu.linkonce.r.*)
+ *(.rela.data .rela.data.* .rela.gnu.linkonce.d.*)
+ *(.rela.tdata .rela.tdata.* .rela.gnu.linkonce.td.*)
+ *(.rela.tbss .rela.tbss.* .rela.gnu.linkonce.tb.*)
+ *(.rela.ctors)
+ *(.rela.dtors)
+ *(.rela.got)
+ *(.rela.bss .rela.bss.* .rela.gnu.linkonce.b.*)
+                0x0000000000010054                PROVIDE (__rela_iplt_start, .)
+ *(.rela.iplt)
+                0x0000000000010054                PROVIDE (__rela_iplt_end, .)
+
+.rel.plt
+ *(.rel.plt)
+
+.rela.plt
+ *(.rela.plt)
+
+.init
+ *(SORT(.init))
+
+.plt
+ *(.plt)
+
+.iplt           0x0000000000010054        0x0
+ *(.iplt)
+ .iplt          0x0000000000000000        0x0 led.o
+
+.text           0x0000000087800000       0xa0
+ *(.text.unlikely .text.*_unlikely .text.unlikely.*)
+ *(.text.exit .text.exit.*)
+ *(.text.startup .text.startup.*)
+ *(.text.hot .text.hot.*)
+ *(.text .stub .text.* .gnu.linkonce.t.*)
+ .text          0x0000000087800000       0xa0 led.o
+                0x0000000087800000                _start
+ *(.gnu.warning)
+ *(.glue_7t)
+ .glue_7t       0x0000000000000000        0x0 linker stubs
+ *(.glue_7)
+ .glue_7        0x0000000000000000        0x0 linker stubs
+ *(.vfp11_veneer)
+ .vfp11_veneer  0x0000000000000000        0x0 linker stubs
+ *(.v4_bx)
+ .v4_bx         0x0000000000000000        0x0 linker stubs
+
+.fini
+ *(SORT(.fini))
+                0x00000000878000a0                PROVIDE (__etext, .)
+                0x00000000878000a0                PROVIDE (_etext, .)
+                0x00000000878000a0                PROVIDE (etext, .)
+
+.rodata
+ *(.rodata .rodata.* .gnu.linkonce.r.*)
+
+.rodata1
+ *(.rodata1)
+
+.ARM.extab
+ *(.ARM.extab* .gnu.linkonce.armextab.*)
+                0x00000000878000a0                PROVIDE (__exidx_start, .)
+
+.ARM.exidx
+ *(.ARM.exidx* .gnu.linkonce.armexidx.*)
+                0x00000000878000a0                PROVIDE (__exidx_end, .)
+
+.eh_frame_hdr
+ *(.eh_frame_hdr)
+
+.eh_frame
+ *(.eh_frame)
+
+.gcc_except_table
+ *(.gcc_except_table .gcc_except_table.*)
+
+.exception_ranges
+ *(.exception_ranges .exception_ranges*)
+                0x00000000878000a0                . = (ALIGN (0x10000) - ((0x10000 - .) & 0xffff))
+                0x00000000878100a0                . = DATA_SEGMENT_ALIGN (0x10000, 0x1000)
+
+.eh_frame
+ *(.eh_frame)
+
+.gcc_except_table
+ *(.gcc_except_table .gcc_except_table.*)
+
+.exception_ranges
+ *(.exception_ranges .exception_ranges*)
+
+.tdata
+ *(.tdata .tdata.* .gnu.linkonce.td.*)
+
+.tbss
+ *(.tbss .tbss.* .gnu.linkonce.tb.*)
+ *(.tcommon)
+
+.preinit_array  0x00000000878100a0        0x0
+                0x00000000878100a0                PROVIDE (__preinit_array_start, .)
+ *(.preinit_array)
+                0x00000000878100a0                PROVIDE (__preinit_array_end, .)
+
+.init_array     0x00000000878100a0        0x0
+                0x00000000878100a0                PROVIDE (__init_array_start, .)
+ *(SORT(.init_array.*))
+ *(.init_array)
+                0x00000000878100a0                PROVIDE (__init_array_end, .)
+
+.fini_array     0x00000000878100a0        0x0
+                0x00000000878100a0                PROVIDE (__fini_array_start, .)
+ *(SORT(.fini_array.*))
+ *(.fini_array)
+                0x00000000878100a0                PROVIDE (__fini_array_end, .)
+
+.ctors
+ *crtbegin.o(.ctors)
+ *crtbegin?.o(.ctors)
+ *(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
+ *(SORT(.ctors.*))
+ *(.ctors)
+
+.dtors
+ *crtbegin.o(.dtors)
+ *crtbegin?.o(.dtors)
+ *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
+ *(SORT(.dtors.*))
+ *(.dtors)
+
+.jcr
+ *(.jcr)
+
+.data.rel.ro
+ *(.data.rel.ro.local* .gnu.linkonce.d.rel.ro.local.*)
+ *(.data.rel.ro .data.rel.ro.* .gnu.linkonce.d.rel.ro.*)
+
+.dynamic
+ *(.dynamic)
+                0x00000000878100a0                . = DATA_SEGMENT_RELRO_END (., 0x0)
+
+.got            0x00000000878100a0        0x0
+ *(.got.plt)
+ *(.igot.plt)
+ .igot.plt      0x0000000000000000        0x0 led.o
+ *(.got)
+ *(.igot)
+
+.data           0x00000000878100a0        0x0
+                0x00000000878100a0                PROVIDE (__data_start, .)
+ *(.data .data.* .gnu.linkonce.d.*)
+ .data          0x00000000878100a0        0x0 led.o
+
+.data1
+ *(.data1)
+                0x00000000878100a0                _edata = .
+                0x00000000878100a0                PROVIDE (edata, .)
+                0x00000000878100a0                . = .
+                0x00000000878100a0                __bss_start = .
+                0x00000000878100a0                __bss_start__ = .
+
+.bss            0x00000000878100a0        0x0
+ *(.dynbss)
+ *(.bss .bss.* .gnu.linkonce.b.*)
+ .bss           0x00000000878100a0        0x0 led.o
+ *(COMMON)
+                0x00000000878100a0                . = ALIGN ((. != 0x0)?0x4:0x1)
+                0x00000000878100a0                _bss_end__ = .
+                0x00000000878100a0                __bss_end__ = .
+                0x00000000878100a0                . = ALIGN (0x4)
+                0x00000000878100a0                . = SEGMENT_START ("ldata-segment", .)
+                0x00000000878100a0                . = ALIGN (0x4)
+                0x00000000878100a0                __end__ = .
+                0x00000000878100a0                _end = .
+                0x00000000878100a0                PROVIDE (end, .)
+                0x00000000878100a0                . = DATA_SEGMENT_END (.)
+
+.stab
+ *(.stab)
+
+.stabstr
+ *(.stabstr)
+
+.stab.excl
+ *(.stab.excl)
+
+.stab.exclstr
+ *(.stab.exclstr)
+
+.stab.index
+ *(.stab.index)
+
+.stab.indexstr
+ *(.stab.indexstr)
+
+.comment
+ *(.comment)
+
+.ARM.attributes
+                0x0000000000000000       0x1f
+ .ARM.attributes
+                0x0000000000000000       0x1f led.o
+
+.debug
+ *(.debug)
+
+.line
+ *(.line)
+
+.debug_srcinfo
+ *(.debug_srcinfo)
+
+.debug_sfnames
+ *(.debug_sfnames)
+
+.debug_aranges  0x0000000000000000       0x20
+ *(.debug_aranges)
+ .debug_aranges
+                0x0000000000000000       0x20 led.o
+
+.debug_pubnames
+ *(.debug_pubnames)
+
+.debug_info     0x0000000000000000       0x76
+ *(.debug_info .gnu.linkonce.wi.*)
+ .debug_info    0x0000000000000000       0x76 led.o
+
+.debug_abbrev   0x0000000000000000       0x14
+ *(.debug_abbrev)
+ .debug_abbrev  0x0000000000000000       0x14 led.o
+
+.debug_line     0x0000000000000000       0x62
+ *(.debug_line .debug_line.* .debug_line_end)
+ .debug_line    0x0000000000000000       0x62 led.o
+
+.debug_frame
+ *(.debug_frame)
+
+.debug_str
+ *(.debug_str)
+
+.debug_loc
+ *(.debug_loc)
+
+.debug_macinfo
+ *(.debug_macinfo)
+
+.debug_weaknames
+ *(.debug_weaknames)
+
+.debug_funcnames
+ *(.debug_funcnames)
+
+.debug_typenames
+ *(.debug_typenames)
+
+.debug_varnames
+ *(.debug_varnames)
+
+.debug_pubtypes
+ *(.debug_pubtypes)
+
+.debug_ranges
+ *(.debug_ranges)
+
+.debug_macro
+ *(.debug_macro)
+
+.gnu.attributes
+ *(.gnu.attributes)
+
+.note.gnu.arm.ident
+ *(.note.gnu.arm.ident)
+
+/DISCARD/
+ *(.note.GNU-stack)
+ *(.gnu_debuglink)
+ *(.gnu.lto_*)
+OUTPUT(led.elf elf32-littlearm)
