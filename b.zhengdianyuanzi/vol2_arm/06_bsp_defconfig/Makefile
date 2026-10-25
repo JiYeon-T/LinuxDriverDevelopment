@@ -19,19 +19,18 @@ CONFIG_FILE 	:= .config
 
 CFLAGS 			:=
 CXXFLAGS		:=
+LIBPATH 		:=
+
 
 INCDIRS 		:= 	. \
 					imx6ul \
-				   	bsp/clk \
-				   	bsp/led \
-				   	bsp/delay \
-					bsp/beep
-				   			   
+
 SRCDIRS			:= 	project
 
 
 ifeq ($(CONFIG_BSP_CLK_ENABLE), y)
 SRCDIRS += bsp/clk
+INCDIRS += bsp/clk
 #TODO:
 # CFLAGS += $(call convert-to-cflag, CONFIG_BSP_CLK_ENABLE)
 CFLAGS += -DCONFIG_BSP_CLK_ENABLE
@@ -39,20 +38,72 @@ endif
 
 ifeq ($(CONFIG_BSP_DELAY_ENABLE), y)
 SRCDIRS += bsp/delay
-# CFLAGS += $(call convert-to-cflag, CONFIG_BSP_DELAY_ENABLE)
+INCDIRS += bsp/delay
 CFLAGS += -DCONFIG_BSP_DELAY_ENABLE
 endif
 
 ifeq ($(CONFIG_BSP_LED_ENABLE), y)
 SRCDIRS += bsp/led
-# CFLAGS += $(call convert-to-cflag, CONFIG_BSP_LED_ENABLE)
+INCDIRS += bsp/led
 CFLAGS += -D CONFIG_BSP_LED_ENABLE
 endif
 
 ifeq ($(CONFIG_BSP_BEEP_ENABLE), y)
 SRCDIRS += bsp/beep
-# CFLAGS += $(call convert-to-cflag, CONFIG_BSP_BEEP_ENABLE)
+INCDIRS += bsp/beep
 CFLAGS += -DCONFIG_BSP_BEEP_ENABLE
+endif
+
+ifeq ($(CONFIG_BSP_KEY_ENABLE), y)
+SRCDIRS += bsp/key
+INCDIRS += bsp/key
+CFLAGS += -DCONFIG_BSP_KEY_ENABLE
+endif
+
+ifeq ($(CONFIG_BSP_GPIO_ENABLE), y)
+SRCDIRS += bsp/gpio
+INCDIRS += bsp/gpio
+CFLAGS += -DCONFIG_BSP_GPIO_ENABLE
+endif
+
+ifeq ($(CONFIG_BSP_INT_ENABLE), y)
+SRCDIRS += bsp/int bsp/exit
+INCDIRS += bsp/int bsp/exit
+CFLAGS += -DCONFIG_BSP_INT_ENABLE
+endif
+
+ifeq ($(CONFIG_BSP_EPIT_ENABLE), y)
+SRCDIRS += bsp/timer
+INCDIRS += bsp/timer
+CFLAGS += -DCONFIG_BSP_EPIT_ENABLE
+endif
+
+ifeq ($(CONFIG_BSP_UART_ENABLE), y)
+SRCDIRS += bsp/uart
+INCDIRS += bsp/uart
+CFLAGS += -DCONFIG_BSP_UART_ENABLE
+# gcc 库文件路径中包含的库文件:
+# crtbegin.o  crtbeginS.o  crtbeginT.o  crtend.o  crtendS.o  finclude  include  include-fixed  install-tools  libcaf_single.a  
+# libgcc.a  libgcc_eh.a  libgcov.a  libgfortranbegin.a  plugin
+#-l链接库;-L指定库文件路径
+LIBPATH 		:= -lgcc -L /usr/local/arm/gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabihf/lib/gcc/arm-linux-gnueabihf/4.9.4/
+#由于uart stdio测试定义了puc,puts 这两个函数, 与内建函数冲突,所以使用 -fno-builtin 表示不使用gcc内建函数,严格使用用户自己的实现
+CFLAGS 			+= -fno-builtin
+endif
+
+ifeq ($(CONFIG_BSP_LCD_ENABLE), y)
+SRCDIRS += bsp/lcd
+INCDIRS += bsp/lcd
+CFLAGS += -DCONFIG_BSP_LCD_ENABLE
+endif
+
+ifeq ($(CONFIG_STDIO_PORT_ENABLE), y)
+SRCDIRS += external/stdio/src test
+INCDIRS += external/stdio/include test
+CFLAGS += -DCONFIG_STDIO_PORT_ENABLE
+#移值 stdio 库时 /tmp/cc7wS8oA.s:42: Error: thumb conditional instruction should be in IT block -- `addcs r5,r5,#65536'
+#加入以下编译选项解决
+CFLAGS += -Wa,-mimplicit-it=thumb
 endif
 
 $(warning dirs:$(SRCDIRS))
@@ -78,25 +129,29 @@ COBJS			:= $(patsubst %, obj/%, $(CFILENDIR:.c=.o))
 #所有的OBJ文件路径
 OBJS			:= $(SOBJS) $(COBJS)
 $(warning objs:$(OBJS))
+$(warning )
+$(warning )
 
 VPATH			:= $(SRCDIRS)
 
 $(TARGET) : $(OBJS)
-	$(LD) -Timx6ul.lds -o $(TARGET).elf $^ -Map=$(TARGET).map
+	$(LD) -Timx6ul.lds -o $(TARGET).elf $^ -Map=$(TARGET).map $(LIBPATH)
 	$(OBJCOPY) -O binary -S $(TARGET).elf $(TARGET).bin
 	$(OBJDUMP) -D -m arm $(TARGET).elf > $(TARGET).dis
 
 $(SOBJS) : obj/%.o : %.S
 #创建保存.o文件的obj目录
 	@mkdir -p obj
-	$(CC) $< -Wall -nostdlib -c -O2 $(INCLUDE) -o $@
+#忽略警告
+#$(CC) $< -Wall -nostdlib -c -O2 $(INCLUDE) -o $@
+	$(CC) $< -nostdlib -c -O2 $(INCLUDE) -o $@
 
 $(COBJS) : obj/%.o : %.c
-	$(CC) $< -Wall -nostdlib -c -O2 $(INCLUDE) $(CFLAGS) -o $@
+	$(CC) $< -nostdlib -c -O2 $(INCLUDE) $(CFLAGS) -o $@
 
 all: $(CONFIG_FILE) $(TARGET)
-	@echo "Build complete, Config used:"
-	@echo $(CONFIG_FILE)
+	@echo "Build complete, Config used:$(CONFIG_FILE)"
+
 
 #模拟生成.config的规则
 #在实际内核中,这一步由 scripts/kconfig/conf 完成

@@ -70,11 +70,11 @@ void led_switch(int led, int status)
 void led_test(void)
 {
     /* 打开LED0 */
-    led_switch(LED0,ON);		
+    led_switch(LED0, ON);		
     delay_ms(500);
 
     /* 关闭LED0 */
-    led_switch(LED0,OFF);	
+    led_switch(LED0, OFF);	
     delay_ms(500);
 }
 #endif

@@ -11,7 +11,8 @@ Copyright © zuozhongkai Co., Ltd. 1998-2019. All rights reserved.
 #ifndef _BSP_KEY_H
 #define _BSP_KEY_H
 
-#define CONFIG_BSP_KEY_TEST_ENABLE 1
+#define CONFIG_BSP_KEY_TEST_ENABLE 0
+#define CONFIG_BSP_KEY_INT_TEST_ENABLE 1
 
 /* 定义按键值 */
 enum keyvalue{
@@ -24,6 +25,11 @@ enum keyvalue{
 /* 函数声明 */
 void key_init(void);
 int key_getvalue(void);
+
+void bsp_key_test_loop(void);
+
+void key_exit_init(void); /* 中断按键初始化 */
+void gpio1_io18_irqhandler(void); /* 中断处理函数 */
 
 
 #endif

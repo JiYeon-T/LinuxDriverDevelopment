@@ -1,8 +1,10 @@
 # LinuxDriverDevelopment
 学习Linux驱动开发的课程，敲的代码
 
+# TODO:
+1. 虚拟内存
 
-# NOTE:  Unix 网络编程/Unix 高级编程放到单独的仓库中去,不这样搞分支了.
+# Unix 网络编程/Unix 高级编程放到单独的仓库中去,不这样搞分支了.
 
 
 
@@ -11,8 +13,6 @@ Auther:QZ
 Date:2021.8.21
 
 
-# TODO:
-1. 虚拟内存
 
 ##### 1. 目录:
 huaqingyuanjian:<Linux驱动开发详解>
@@ -40,3 +40,5 @@ git clone ssh://git@ssh.github.com:443/JiYeon-T/LinuxDriverDevelopment.git
 https://www.gnu.org/software/libc/manual/html_node/
 
 ##### 7. 
+
+

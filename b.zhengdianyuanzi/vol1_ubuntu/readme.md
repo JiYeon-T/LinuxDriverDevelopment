@@ -8,6 +8,8 @@ ROS 虚拟机位置：D:\install_location\ubuntu16.04
 
 Linux 驱动开发/调试虚拟机：F:
 
+
+
 ##  二、VMVare Tools 安装
 
 ##  解决全屏后黑边/无法铺满问题
@@ -19,12 +21,12 @@ Linux 驱动开发/调试虚拟机：F:
    - 保持虚拟机开机运行，在顶部菜单栏点击「VM→Install VMware Tools」；
    - Windows客户机：打开虚拟光盘，双击`setup64.exe`以管理员安装，完成后重启；
    - Linux（如Ubuntu）客户机：终端执行命令`sudo apt update && sudo apt install open-vm-tools-desktop -y`，安装完成后重启服务`sudo systemctl restart vmtoolsd`。
-
 2. ‌**开启自动分辨率适配**‌：
    关闭虚拟机后，右键点击虚拟机选择「设置→硬件→显示器」，勾选「自动调整客户机分辨率」，建议同时勾选「加速3D图形」，保存后重启虚拟机即可。
-
 3. ‌**手动触发适配**‌：
    虚拟机运行后，点击顶部「查看→自动调整大小→立即适应客户机」，即可强制同步宿主机分辨率，消除黑
+
+
 
 ## SougouPinYin installation
 uninstall Fcitx and install SouGouPinYin
@@ -215,7 +217,9 @@ groups  # display users in group
 delgroup  # delete group
 
 
+
 ## file operation permission
+
 rwx
 421
 
@@ -234,7 +238,10 @@ sudo chown .root hello  # modify file's group to root
 sudo chown root.root hello  # modify file's owner and group to root
 ```
 
+
+
 ## Linux link file
+
 - hard link
 same INode number
 
@@ -248,6 +255,8 @@ ln -s hello hello3
 
 cp -d hello3 hello4  # copy with symbolic
 ```
+
+
 
 ## vim
 

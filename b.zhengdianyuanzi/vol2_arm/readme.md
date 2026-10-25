@@ -779,20 +779,149 @@ CFLAGS += -Iinclude/generated
 
 
 
-## 主频
+# 主频
 
-### 操作步骤(方法论)
-
-
+通过设置 CCM(Clock Control Module) 实现调整 CPU 以及各外设主频的。
 
 
 
-
+## 操作步骤(方法论)
 
 
 
 
 
+# 中断
+
+ARM Cortex-A7 内核有 8 个中断，分别是：复位中断（Reset），未定义指令中断（Undefined）,SVC 中断，指令预取终止中断，数据预取中断，未使用中断，IRQ 中断，FIQ 中断。分别对应 CPU 的 8 个模式。
+
+## GIC 
+
+外设中断与 CPU 之间的桥梁，只要求：IQ, FIQ, VIQ, VFIQ 四种方式
+
+外设 -------- [GIC] - --------  [CPU]
+
+GIC 的分发端连接外设中断，获取中断并映射为指定的中断 ID，寄存器地址 GIC base address + 0x1000
+
+GIC 的 CPU 接口端连接 CPU，将外设中断传递给 CPU，寄存器地址 GIC base address + 0x2000
+
+《ARM Generic Interrupt Controller v2.0.pdf》
+
+
+
+## CP15 协处理器
+
+CP15 协处理器一般用于存储系统管理，但是在中断中也会使用到，CP15 协处理器一共有 16 个 32 位寄存器。
+
+C0-C15 个寄存器，使用 MCR 和 MRC 控制从协处理器到 cpu 的数据交互。
+
+当指令的参数不同时，CR0~15 寄存器的功能也是不同的。
+
+《ARM Architecture Reference Manual ARMv7-A and ARMv7-R edition.pdf》"B3.17 Organization of the CP15 registers in a VMSA implementation"
+
+《Cortex-A7 Technical Reference Manua.pdf》"Chapter 4 System Control" 
+
+
+
+## 操作步骤
+
+1. 中断使能， cpsr.f, cpsr.i
+
+2. 设置中断优先级分组/个数(总共支持多少个优先级) GICC_PMR，比如：IMX6U支持 32 级优先级
+3. 设置指定中断的抢占优先级和子优先级 GICC_BPR.  简单起见可以将中断的优先级都设置为抢占优先级
+4. 设置指定中断 ID 的优先级，也就是设置外设优先级
+
+
+
+中断执行：
+
+
+
+
+
+# Timer
+
+
+
+## EPIT
+
+Enhanced Periodic Interrupt Timer
+
+当定时器的值减为 0，就会重新装载初值，然后继续运行。
+
+
+
+
+
+## GPT
+
+Generic Purpose Timer
+
+
+
+## 操作步骤：
+
+1. 设置时钟源
+
+2. 设置分频值
+3. 设置工作模式
+4. 设计计数器的初值以及来源
+5. 使能比较中断
+6. 设置加载值和比较值
+7. 中断设置和中断服务程序编写
+8. 时能定时器
+
+
+
+# UART
+
+## 操作步骤
+
+1. 初始化 GPIO，设置管脚
+2. 设置UART 时钟源
+3. 初始化 UART，根据时钟源设置波特率，奇偶位，停止位，数据位等
+4. 使能 UART
+5. 编写 UART 数据收发函数
+
+
+
+
+
+# DDR
+
+
+
+## RAM & ROM
+
+RAM: 掉电后数据丢失，高速。
+
+- SRAM (Static RAM)
+
+一般来说使用并行通信方式，地址线和数据线分离。
+
+价格高，容量小。
+
+适合做高速缓存(Cache) 或MCU 内部的 RAM
+
+- SDRAM(Synchronous Dynamic RAM)
+
+SDRAM 中的数据需要不断的刷新来保证数据不丢失，
+
+集成度高，功耗低，成本低，适合做大容量。但是需要不断刷新数据保证不丢失。
+
+适合做内存条。
+
+SDRAM 目前已经发展到了第四代：SDRAM, DDR SDRAM, DDR2 SDRAM, DDR3 SDRAM, DDR4 SDRAM
+
+- DDR(Double Data Rate SDRAM)
+
+IMX6ULL 的DDR 控制器 ——MMDC
+
+
+
+
+
+ROM:掉电后数据不丢失，低速 
 
 
 
@@ -800,8 +929,32 @@ CFLAGS += -Iinclude/generated
 
 
 
+# LCD
 
 
+
+## eLCDIF 接口
+
+数据总线：支持 24位(RGB888)，18 位(RGB666)，16 位(RGB565) 等多种位宽
+
+像素时钟：整个接口的节拍器，每个时钟周期锁存一个像素数据(并行传输)
+
+同步信号：行同步(HSYNC)，场同步(VSYNC) 
+
+## 操作步骤
+
+1. 初始化所使用的 IO，复用为 eLCDIF 接口
+2. 设置 LCD 的像素时钟，配置时钟源
+3. 根据 LCD 数据手册配置 eLCDIF 对应的寄存器
+4. 时能 eLCDIF
+
+
+
+# RTC
+
+
+
+TODO: 还剩 5 个测试
 
 
 

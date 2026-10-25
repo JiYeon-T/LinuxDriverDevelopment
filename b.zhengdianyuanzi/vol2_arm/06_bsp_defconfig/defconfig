@@ -5,12 +5,32 @@ CONFIG_BSP_CLK_ENABLE=y
 # enable delay API
 CONFIG_BSP_DELAY_ENABLE=y
 
-# led test
+# led enable
 CONFIG_BSP_LED_ENABLE=y
 
-# beep test
+# beep enable
 CONFIG_BSP_BEEP_ENABLE=y
 
+# key enable
+CONFIG_BSP_KEY_ENABLE=y
+
+# gpio enable
+CONFIG_BSP_GPIO_ENABLE=y
+
 # GPIO interrupt test
-CONFIG_BSP_INT_TEST_ENABLE=y
+CONFIG_BSP_INT_ENABLE=y
+
+# EPIT timer enable
+CONFIG_BSP_EPIT_ENABLE=y
+
+# UART
+CONFIG_BSP_UART_ENABLE=y
+
+#从uboot中移了一些标准库的函数,printf(),sssscanf(),snprintf()等等
+CONFIG_STDIO_PORT_ENABLE=y
+
+# LCD
+CONFIG_BSP_LCD_ENABLE=y
+
+#defconfig 末尾必须留空行,否则生成的.config文件最后2个配置是粘在一起的,
 

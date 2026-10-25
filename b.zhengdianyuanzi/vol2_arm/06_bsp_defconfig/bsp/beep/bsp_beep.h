@@ -11,7 +11,7 @@ Copyright © zuozhongkai Co., Ltd. 1998-2019. All rights reserved.
 #ifndef __BSP_BEEP_H
 #define __BSP_BEEP_H
 
-#define CONFIG_BSP_BEEP_TEST_ENABLE 1
+#define CONFIG_BSP_BEEP_TEST_ENABLE 0
 
 
 /* 函数声明 */

@@ -1069,11 +1069,11 @@ Copyright © zuozhongkai Co., Ltd. 1998-2019. All rights reserved.
  * @endcode
  *
  * @param muxRegister  The pin mux register.
- * @param muxMode      The pin mux mode.
+ * @param muxMode      The pin mux mode. 寄存器 bit[3:0]
  * @param inputRegister The select input register.
  * @param inputDaisy   The input daisy.
- * @param configRegister  The config register.
- * @param inputOnfield   Software input on field.
+ * @param configRegister  The config register address.
+ * @param inputOnfield   Software input on field. SION bit, datasheet 32.3.2 SW Loopback through SION bit 
  */
 static inline void IOMUXC_SetPinMux(uint32_t muxRegister,
                                     uint32_t muxMode,
@@ -1082,9 +1082,13 @@ static inline void IOMUXC_SetPinMux(uint32_t muxRegister,
                                     uint32_t configRegister,
                                     uint32_t inputOnfield)
 {
+   /* 这个参数在 IOMUXC_SetPinConfig() 中使用 */
+    (void)configRegister;
+
     *((volatile uint32_t *)muxRegister) =
         IOMUXC_SW_MUX_CTL_PAD_MUX_MODE(muxMode) | IOMUXC_SW_MUX_CTL_PAD_SION(inputOnfield);
 
+    /* 如果是 input register 还需要配饰 DAISY 寄存器 */
     if (inputRegister)
     {
         *((volatile uint32_t *)inputRegister) = IOMUXC_SELECT_INPUT_DAISY(inputDaisy);
@@ -1100,11 +1104,11 @@ static inline void IOMUXC_SetPinMux(uint32_t muxRegister,
  * IOMUXC_SetPinConfig(IOMUXC_GPIO1_IO02_I2C1_SCL, IOMUXC_SW_PAD_CTL_PAD_PUE_MASK | IOMUXC_SW_PAD_CTL_PAD_PUS(2U));
  * @endcode
  *
- * @param muxRegister  The pin mux register.
- * @param muxMode      The pin mux mode.
- * @param inputRegister The select input register.
- * @param inputDaisy   The input daisy.
- * @param configRegister  The config register.
+ * @param muxRegister  The pin mux register. 本 API 中为使用, IOMUXC_SetPinMux() 使用.
+ * @param muxMode      The pin mux mode. 本 API 中为使用, IOMUXC_SetPinMux() 使用.
+ * @param inputRegister The select input register. 本 API 中为使用, IOMUXC_SetPinMux() 使用.
+ * @param inputDaisy   The input daisy. 本 API 中为使用, IOMUXC_SetPinMux() 使用.
+ * @param configRegister  The config register address. 设置电气属性的寄存器地址.
  * @param configValue   The pin config value.
  */
 static inline void IOMUXC_SetPinConfig(uint32_t muxRegister,
@@ -1114,6 +1118,10 @@ static inline void IOMUXC_SetPinConfig(uint32_t muxRegister,
                                        uint32_t configRegister,
                                        uint32_t configValue)
 {
+    (void)muxRegister;
+    (void)muxMode;
+    (void)inputRegister;
+    (void)inputDaisy;
     if (configRegister)
     {
         *((volatile uint32_t *)configRegister) = configValue;

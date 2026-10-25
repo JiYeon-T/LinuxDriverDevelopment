@@ -14,5 +14,6 @@ Copyright © zuozhongkai Co., Ltd. 1998-2019. All rights reserved.
 #define CONFIG_BSP_CLK_TEST_ENABLE 1
 
 void clk_enable(void);
+void imx6u_clkinit(void);
 
 #endif

@@ -11,7 +11,7 @@ Copyright © zuozhongkai Co., Ltd. 1998-2019. All rights reserved.
 #ifndef __BSP_LED_H
 #define __BSP_LED_H
 
-#define CONFIG_BSP_LED_TEST_ENABLE 1
+#define CONFIG_BSP_LED_TEST_ENABLE 0
 
 
 #define LED0	0

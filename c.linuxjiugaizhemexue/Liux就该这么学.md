@@ -6,23 +6,11 @@
 
 写一个关闭笔记本 touchpad 的脚本,放到开机文件里/手动执行
 
-- openssl
+- openssl, open ssh
 - tcpdump 抓包看下， FTP/TFTP 是明文传输, ssh 是加密传输
 - ch18, 本地本来是 MySQL 数据库，里面保存了一些数据。安装 MariaDB 后数据被迁移到了 /var/lib/mysql-5.7 目录，需要想办法恢复数据并迁移到 MariaDB 中
-
-#### 扩展:
-
-TODO:
-
-- awk 脚本
-
-```shell
-awk # 也可以用于 shell 字符串操作
-```
-
-
-
-- sed 
+- sysfs
+- udev
 
 
 
@@ -167,10 +155,12 @@ apt-key adv --help # advanced operation
 #N: See apt-secure(8) manpage for repository creation and user configuration details.
 
 sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80  --refresh-keys
-sudo apt-get update
+sudo apt-get update  # 更新本地数据库
 ```
 
 - ubuntu/debain 配置 apt 清华源/阿里源
+
+apt 也是典型的 C/S 架构，其实就是配置服务器的地址。
 
 https://mirrors.tuna.tsinghua.edu.cn/
 
@@ -189,9 +179,16 @@ https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/
  `sudo apt install apt-transport-https ca-certificates`
 这里直接将 `/etc/apt/sources.list` 中的 `https` 改为 `http`， 然后先 `sudo apt update`再使用执行清华源Debian使用帮助中的命令，再改回https即可
 
+```shell
+sudo apt-get check  # 检查依赖关系
+sudo apt-get install minicom  # 安装软件
+sudo apt-get upgrade package-name  # 升级/更新软件
+sudo apt-get remove package-name  # 卸载软件
+```
 
 
-TODO
+
+# TODO
 
 ca-certificates 包的使用方法。
 
@@ -234,7 +231,7 @@ systemctl 管理服务的开机启动等
 - man - manual
 
 ```shell
-man man
+man man  # 查看 man 命令的使用帮助
 #命令使用提示
 Usage:
  mount [-lhV] # 默认参数
@@ -325,20 +322,19 @@ ifconfig
 - uname - 查看系统内核以及版本等信息
 
 ```shell
-uname -a
-uname -r
-#  -r, --kernel-release     print the kernel release
+uname -a  #  -a, --all                print all information, in the following order,
+uname -r  #  -r, --kernel-release     print the kernel release
 uname -n # qz
 # -n, --nodename           print the network node hostname
-uname -s 
-# -s, --kernel-name        print the kernel name
+uname -s  # -s, --kernel-name        print the kernel name
+# -o, --operating-system   print the operating system
 ```
 
-shell 命令框前面的提示 "qz@qz" 是什么意思
+`shell` 命令框前面的提示 "qz@qz" 是什么意思
 
-第一个是终端当前登录的用户名称,
+第一个 qz 是终端当前登录终端的用户名称;
 
-第二个是主机名
+第二个  qz 是主机名;
 
 ```shell
 qz@qz:~/test$  uname -n
@@ -346,10 +342,12 @@ qz
 qz@qz:~/test$ 
 qz@qz:~/test$  sudo -i root
 [sudo] password for qz: 
--bash: root: command not found
-qz@qz:~/test$ 
 qz@qz:~/test$ sudo -i # 切换到 root
 root@qz:~#  sudo --help
+
+sudo su # 切换 root
+qz@ubuntu:~/code$   sudo su
+root@ubuntu:/home/qz/code# 
 ```
 
 
@@ -435,33 +433,51 @@ env | grep bash
 
 - chmod - 修改文件/目录权限
 
-权限位: rwxrwxrwx (user, group, other)
+权限位: rwx rwx rwx (分别对应着 user, group, other 的权限)
+
+当使用数字修改权限时，没办法只修改某一位
 
 ```shell
 chmod --help
 man chmod
-chmod u+x test.sh # 为 user 添加 execute 权限
+chmod u+x test.sh  # 为 user 添加 execute 权限, 
+chmod 777 test.sh  # 所有权限都打开
 #  Each           MODE           is          of          the          form
 # '[ugoa]*([-+=]([rwxXst]*|[ugo]))+|[-+=][0-7]+'
-# -c, --changes          like verbose but report only when a change is made
-# -f, --silent, --quiet  suppress most error messages
+# -c, --changes          like verbose but report only when a change is made， 效果类俗于 -v 但是仅显示更改的部分
+# -f, --silent, --quiet  suppress most error messages, 不显示错误信息
 # -v, --verbose          output a diagnostic for every file processed
-# -R, --recursive        change files and directories recursively
+# -R, --recursive        change files and directories recursively，递归处理，文件夹中的所有文件权限都进行修改
 ```
+
+当用字母格式添加时：
+
+u - user, g - group, o - other
+
+r - 可读, w - 可写, x - 可执行
+
+= - 赋值权限, + - 添加权限, - - 删除权限
+
+
 
 - chown - 修改文件所有者 / 文件所属组
 
 需要 sudo 权限-
 
 ```shell
+chown [参数] [用户名.<组名>] [文件名/目录]
 chown -R system:root test # 修改 test 文件夹的所属组为 system, 所有者为 root
 #Examples:
 #  chown root /u        Change the owner of /u to "root".
 #  chown root:staff /u  Likewise, but also change its group to "staff".
 #  chown -hR root /u    Change the owner of /u and subfiles to "root".
+# -c, --changes  like verbose but report only when a change is made, 效果类俗于 -v 但是仅显示更改的部分
+# -f, --silent, --quiet  suppress most error messages 不显示错误信息
+# -v, --verbose          output a diagnostic for every file processed
+# -R, --recursive        change files and directories recursively，递归处理，文件夹中的所有文件权限都进行修改
+# -h, --no-dereference   affect symbolic links instead of any referenced file, 只对符号链接的文件修改，不改动任何其他相关的文件
 
-# -h, --no-dereference   affect symbolic links instead of any referenced file
-# -R, --recursive        operate on files and directories recursively
+sudo chown root.root test  # 修改用户和用户组都为 root
 ```
 
 
@@ -607,7 +623,74 @@ strace ls
 cat /etc/os-release
 ```
 
+- awk 脚本
 
+**awk 是 Linux/UNIX 系统中一种强大的文本处理编程语言和数据分析工具**，它与 `grep`(搜索) 和 `sed` （编辑）并成为 Linux 文本处理三剑客。
+
+awk + grep + sed
+
+# TODO:
+
+```shell
+awk # 也可以用于 shell 字符串操作
+```
+
+
+
+- sed - stream editor
+
+```shell
+sed --help
+  -i[SUFFIX], --in-place[=SUFFIX]  # 直接修改源文件
+    edit files in place (makes backup if SUFFIX supplied)
+  -n, --quiet, --silent # 取消默认输出，仅打印匹配的行
+    suppress automatic printing of pattern space
+  -e script, --expression=script # 允许多个编辑命令同时执行
+                 add the script to the commands to be executed
+  -r, --regexp-extended  # 支持正则表达式
+                 use extended regular expressions in the script.
+
+#e.g. 替换
+sed 's/old/new/' file.txt  # 使用 new 替换 old，基本替换(每行只替换一个匹配项)
+sed 's/old/new/g' file.txt # 使用 new 替换 old，全局替换
+sed '3s/old/new/' file.txt # 指定行替换,只替换第三行
+sed '3,5s/old/new/' file.txt # 指定行替换,只替换第 3~5 行
+
+# 删除
+sed '2d' file.txt  # 删除第二行
+sed '2.$d' file.txt # 删除 2~最后一行
+sed '/error/d' file.txt # 删除包含 error 的行
+```
+
+
+
+- awk
+
+# TODO
+
+```shell
+```
+
+- reboot - 重启
+
+
+
+- poweroff - 关机
+
+
+
+- install - 安装软件
+
+将文件(通常是编译后的文件)复制到指定位置
+
+
+
+- strace - 跟踪 Linux 命令执行过程中调用了那些 Linux 的系统调用
+
+```shell
+strace --help
+strace ls
+```
 
 
 
@@ -621,7 +704,9 @@ cat /etc/os-release
 
 ```shell
 cat -n
-# -n, --number             number all output lines
+# -n, --number             number all output lines, 显示行号
+#-b, --number-nonblank    number nonempty output lines, overrides -n, 非空白行才显示行号
+# -e                       equivalent to -vE
 cat --help
 ```
 
@@ -659,13 +744,23 @@ wc -c test.cpp
 #-c, --bytes            print the byte counts
 ```
 
-- stat - 查看文件的存储信息和时间等信息
+- stat - 查看文件的存储信息, 链接数, 大小, 三种时间（a, m, c / access, modify, change）等信息
 
 ```shell
 stat test.cpp
 stat -f test.cpp
 # -f, --file-system     display file system status instead of file status
 stat --help
+
+qz@ubuntu:/tmp/test$  stat a 
+  File: 'a'
+  Size: 8         	Blocks: 8          IO Block: 4096   regular file
+Device: 801h/2049d	Inode: 261882      Links: 3
+Access: (0664/-rw-rw-r--)  Uid: ( 1000/      qz)   Gid: ( 1000/      qz)
+Access: 2026-07-04 10:55:28.393414471 +0800
+Modify: 2026-07-04 10:55:24.449358388 +0800
+Change: 2026-07-04 10:55:24.449358388 +0800
+ Birth: -
 ```
 
 - cut - 按列提取需要的内容
@@ -705,6 +800,21 @@ tee --help
 
 ###### 文件目录管理命令
 
+- ls - list directory contents
+
+```shell
+# -a 显示所有文件, 包括 . and ..
+# -A 显示所有文件, 不包括 . and ..
+# -l 显示文件详细信息
+# -R 递归显示所有文件
+# -i, --inode                print the index number of each file, 显示文件 i 节点编号
+
+```
+
+
+
+
+
 - touch - 创建文件
 
 ```shell
@@ -721,7 +831,7 @@ touch --help
 ```shell
 mkdir --help
 # -v, --verbose     print a message for each created directory
-# -p, --parents     no error if existing, make parent directories as needed
+# -p, --parents     no error if existing, make parent directories as needed, 递归创建， 
 ```
 
 - cp - copy
@@ -730,7 +840,7 @@ mkdir --help
 # -p 保留源文件的属性, -p                           same as --preserve=mode,ownership,timestamps
 # -d 若对象文件为"链接文件",则保留该链接文件的属性, -d                           same as --no-dereference --preserve=links
 # -r 递归持续复制,用于目录,-R, -r, --recursive          copy directories recursively
-# -i 若目标文件存在则询问,是否覆盖
+# -i 若目标文件存在则询问是否覆盖
 # -a 相当于 -pdr, -a, --archive                same as -dR --preserve=all
 ```
 
@@ -746,9 +856,23 @@ mv x.log y.log # 作用等同于重命名
 
 ```shell
 rm --help
-# -f, --force           ignore nonexistent files and arguments, never prompt
-# -r, -R, --recursive   remove directories and their contents recursively
+# -f, --force           ignore nonexistent files and arguments, never prompt, 强制删除文件和文件夹
+# -r, -R, --recursive   remove directories and their contents recursively, 递归删除
+# -d 直接把要删除的目录硬链接删成 0, 删除该目录
+# -v, --verbose         explain what is being done 
+# -i                    prompt before every removal, 删除之前先询问
 ```
+
+- rmdir - remove empty directories
+
+```shell
+rmdir --help
+-p, --parents
+remove DIRECTORY and its ancestors; e.g., 'rmdir -p a/b/c' is similar to 'rmdir a/b/c a/b a'
+
+```
+
+
 
 - dd - 按照指定大小和个数的数据块来复制文件或转换文件
 
@@ -781,6 +905,81 @@ file /test.cpp
 
 ###### 打包压缩与搜索命令
 
+- zip - 
+
+```shell
+ zip [参数] [压缩后的文件名] [压缩文件]
+ -f   freshen: only changed files 
+  -u   update: only changed or new files
+  -d   delete entries in zipfile, 从 zip 文件中删除一个文件
+  -m   move into zipfile (delete OS files)，压缩完以后删除源文件
+  -r   recurse into directories     
+  -j   junk (don't record) directory names， 保存文件的名，不保存目录
+  -0   store only                   
+  -l   convert LF to CR LF (-ll CR LF to LF)
+  -1   compress faster              
+  -9   compress better
+  -q   quiet operation    ,不显示命令执行过程          
+  -v   verbose operation/print version info，显示执行过程
+  -c   add one-line comments        
+  -z   add zipfile comment
+  -@   read names from stdin        
+  -o   make zipfile as old as latest entry
+  -x   exclude the following names  
+  -i   include only the following names
+  -F   fix zipfile (-FF try harder) ,尝试修复已损坏的压缩文件
+  -D   do not add directory entries
+  -A   adjust self-extracting exe   
+  -J   junk zipfile prefix (unzipsfx)
+  -T   test zipfile integrity       
+  -X   eXclude eXtra file attributes
+  -y   store symbolic links as the link instead of the referenced file
+  -e   encrypt, 压缩过程中设置密码
+  -n   don't compress these suffixes，不压缩特定扩展名的文件
+  -h2  show more help
+
+zip -rv test.zip a.txt b.txt c.txt
+```
+
+- unzip -
+
+```shell
+  -p  extract files to pipe, no messages     
+  -l  list files (short format), 显示(不解压)压缩文件内包含的所有文件
+  -f  freshen existing files, create none    
+  -t  test compressed archive data,检查压缩文件是否损坏，但不解压
+  -u  update files, create if necessary      
+  -z  display archive comment only，只显示压缩文件的注解
+  -v  list verbosely/show version info       
+  -T  timestamp archive to latest
+  -x  exclude files that follow (in xlist)   ，指定 zip 中的哪些文件不要处理
+  -d  extract files into exdir modifiers, 指定解压目录: unzip test.zip -d test2
+  -n  never overwrite existing files，解压时不要覆盖原有文件
+  -q  quiet mode (-qq => quieter)，静默执行，不显示任何信息, unzip -oqq test.zip -o test
+  -o  overwrite files WITHOUT prompting,强制覆盖已有文件: unzip test.zip -o test, 仅覆盖已存在的文件奥, 如果 test 文件夹下已有其他文件,是不会删除的
+  -a  auto-convert any text files
+  -j  junk paths (do not make directories) 不处理压缩文件中的原有目录路径
+  -aa treat ALL files as text
+  -U  use escapes for all non-ASCII Unicode  
+  -UU ignore any Unicode fields
+  -C  match filenames case-insensitively 压缩包中的文件名称区分大小写,
+  -L  make (some) names lowercase，
+  -LL 将压缩文件文件中的文件名全部改为小写
+  -X  restore UID/GID info                   
+  -V  retain VMS version numbers
+  -K  keep setuid/setgid/tacky permissions   
+  -M  pipe through "more" pager
+  -O CHARSET  specify a character encoding for DOS, Windows and OS/2 archives
+  -I CHARSET  specify a character encoding for UNIX and other archives
+-P 密码， 解压密码
+```
+
+
+
+
+
+
+
 - tar - 打包/压缩/解压	
 
 ```shell
@@ -790,12 +989,17 @@ tar -xzvf test.tar.gz -C /test2 # 解压到 test2 目录
 # -C 指定解压到的目录
 # -x 解压缩
 # -t 查看压缩包内有哪些文件
-# -z 用 Gzip 解压或压缩
-# -j 用 bzip2 解压或压缩
+# -z 用 Gzip 解压或压缩, .tar.gz 后缀 压缩:tar -vczf test1.tar.gz test1; 解压:tar -vxzf test1.tar.gz
+# -j 用 bzip2 解压或压缩, .tar.bz2 后缀 tar -vcjf test1.tar.bz2 test1;  解压:tar -vxjf test1.tar.gz
+# -Z 用 compress 压缩, `/bin/compress` 工具压缩，这是 gzip 出现之前 Unix 系统中最主流的压缩方式，但现在已经很少使用，因为其在压缩率和速度上都赶不上 gzip 和 bzip2
 # -v 显示解压过程
 # -f 目标文件名, 因此 -f 必须放到最后一个
 # -p 保留原始的权限与属性
 # -P 使用绝对路径来压缩
+# -m 还原文件时，不变更文件的更改时间
+# -r 新增文件到已存在的备份文件的结尾部分
+# -t 列出备份文件内容
+# 
 ```
 
 - grep - 文本搜索
@@ -809,6 +1013,8 @@ grep --help
 # -v 反向选择,仅列出没有关键词的行
 # -r, --recursive           like --directories=recurse
 
+grep -irn "abc" .  # 从当前目录的所有文件中搜索字符串 abc
+
 # 通过 /etc/password 查找出不允许登录系统的用户
 # 登录终端设置为 /sbin/nologin 的用户不允许登录
 grep -n /sbin/nologin /etc/password
@@ -819,6 +1025,11 @@ grep -vn /sbin/nologin /etc/password
 - find - 查找文件
 
 ```shell
+find [路径] [参数] 关键字
+
+find --help 
+man find
+  
 find . -name "test*" # 搜索字符串支持正则表达式
 find /etc -name "host*" -print
 find / -perm -4000 -print # 查找整个系统中搜索权限中包括 SUID 权限的所有文件
@@ -1091,6 +1302,9 @@ su --help
 #  --preserve-environment        do not reset environment variables, and
                                 keep the same shell
 #  -s, --shell SHELL             use SHELL instead of the default in passwd
+
+#切换到 root 用户,切换后所有的命令都可以执行,所有的目录都可以访问
+sudo su
 ```
 
 ###### Linux 中的 Login shell 和 nologin shell
@@ -1105,9 +1319,9 @@ non-login shell：取得 bash 接口的方法不需要重复登陆的举动，�
 
 **a. 一般来说，login shell 其实只会读取这两个配置文件：**
 
-/etc/profile：这是系统整体的配置，一般尽量不要修改这个文件.例如:为整个系统设置的环境变量添加在该目录下；
+`/etc/profile`：这是系统整体的配置，一般尽量不要修改这个文件.例如:为整个系统设置的环境变量添加在该目录下；
 
-~/.bash_profile 或 ~/.bash_login 或 ~/.profile：属于使用者个人配置，需要修改自己的数据，就写入这些文件！（注意：其实 bash 的 login shell 配置只会读取上面三个文件的其中一个， 而读取的顺序则是依照上面的顺序(~/.bash_profile ->  ~/.bash_login -> ~/.profile), 找到一个存在的文件就停止???）
+`~/.bash_profile` 或 `~/.bash_login` 或 `~/.profile`：属于使用者个人配置，需要修改自己的数据，就写入这些文件！（注意：其实 bash 的 login shell 配置只会读取上面三个文件的其中一个， 而读取的顺序则是依照上面的顺序(~/.bash_profile ->  ~/.bash_login -> ~/.profile), 找到一个存在的文件就停止???）
 
 ```shell
 # cat ~/.bashrc # linux 用户单独添加环境变量以及设置的命令别名(alias)就可以在该文件中
@@ -1150,7 +1364,7 @@ su-
 su - root
 su -l root
 # 不建议使用/错误用法
-su
+su  # su 命令不写明用户名的话默认切换到 root 用户
 su root
 
 # 登录后使用 CTRL + D 可以退出(logout)
@@ -1171,12 +1385,13 @@ su root
 # sudo - execute a command as another user
 sudo -i # change to root
 #  -i, --login                 run login shell as the target user; a command may also be specified
-#  -, -l, --login                make the shell a login shell
-#  -c, --command COMMAND         pass COMMAND to the invoked shell
+#  -l, --list                  list user's privileges or check a specific command; use twice for longer
+#                              format
 # -l 列出当前用户可执行的命令
+
+#  -c, --command COMMAND         pass COMMAND to the invoked shell
 # -u 用户名或 UID, 以指定的用户身份执行命令
-# -k 清空密码的有效时间
-# -b 在后台执行指定的命令
+# -k 清空密码的有效时间# -b 在后台执行指定的命令
 # -p 更改询问密码的提示语
 ```
 
@@ -1358,18 +1573,24 @@ export os=LINUX
 
 **NOTE:测试用例参考 4_shell 文件夹内的 shell 脚本**
 
-- vim
+##### vim
 
-命令模式: 
+vi 和 vim 还不一样, Ubuntu 默认带的是 vi(不太好用)
 
-默认模式
+```shell
+sudo apt-get install vim
+```
+
+
+
+**命令模式:** 默认模式
 
 ```shell
 ?字符串 # 从下往上搜索字符串
 /字符串 # 从上往下搜索字符串
 ```
 
-末行模式: 
+**末行模式:** 
 
 命令模式通过 : 进入末行模式;  esc 键退出
 
@@ -1378,13 +1599,45 @@ export os=LINUX
 :set nonu # 不显示行号
 ```
 
-输入模式: 命令模式通过 a, i, o 键进入输入模式;  esc 键退出
+vim 可以设置永久显示行号以及调整 TAB 空格数，修改 vim 配置文件 `/etc/vim/vimrc`
+
+```shell
+ # "tab = 4 spaces"
+ set ts=4
+ # "vi display line number"
+ set nu
+```
+
+vi 在末行模式搜索/替换字符串
+
+```shell
+:s/old/new/  # 替换当前行的第一个匹配项：查找 old, 用 new 替代
+:s/old/new/g  # 替换当前行的所有匹配项：查找 old, 用 new 替代
+:10,20s/old/new/g
+:%s/old/new/g  # 整个文件，% 达标从第一行到最后一行
+```
+
+
+
+**输入(编辑)模式**: 命令模式通过 a, i, o 键进入输入模式;  esc 键退出
 
 ```shell
 a - 光标后一个位置
 i - 光标前一个位置
 o - 光标所在位置另起一行
 ```
+
+
+
+**NOTE:在终端编辑中 Ctrl + S 并不是保存文件的功能，而是暂停终端的功能。 可以通过 CTRL + Q 恢复**
+
+
+
+ 
+
+
+
+
 
 
 
@@ -1521,6 +1774,12 @@ Linux 是一个多用户,多任务的操作系统. 一个 Linux 实体机可以�
 
 - users - Output who is currently logged in according to FILE.
 
+```shell
+users
+```
+
+
+
 - UID - user identifier
 
 管理员 - root , 0
@@ -1550,6 +1809,21 @@ useradd --help
 useradd -d /home/xxy -u 8888 -s /sbin/nologin xxy
 id xxy
 ```
+
+useradd 与 adduser 的区别，一个是 shell 命令，一个是通过 Perl 的脚本。
+
+功能一致：都是实现添加用户的功能。
+
+- adduser
+
+```shell
+# -r, --system                  create a system account 添加一个系统用户
+# -d, --home-dir HOME_DIR       home directory of the new account 表示用户的主目录路径
+# -u, --uid UID                 user ID of the new account, 用户的 uid
+# -g, --gid GROUP               name or ID of the primary group of the new account, 表示用户所属的组名
+```
+
+
 
 - groupadd - 创建用户组
 
@@ -1601,11 +1875,71 @@ passwd # 修改当前用户的密码
 删除用户时,用户的家目录默认会保存下来,可以使用 -r 参数删除
 
 ```shell
+# userdel --help
+# man userdel
 -f # 强制删除用户
--r # 同时删除用户以及用户家目录
+-r # -r, --remove  remove home directory and mail spool, 同时删除用户以及用户家目录
+-backup  # 备份用户信息
+```
+
+- deluser
+
+```shell
+qz@ubuntu:~/code$  deluser --help
+deluser USER
+  remove a normal user from the system
+  example: deluser mike
+
+  --remove-home             remove the users home directory and mail spool
+  --remove-all-files        remove all files owned by user
+  --backup                  backup files before removing.
+  --backup-to <DIR>         target directory for the backups.
+                            Default is the current directory.
+  --system                  only remove if system user
+
+delgroup GROUP
+deluser --group GROUP
+  remove a group from the system
+  example: deluser --group students
 ```
 
 
+
+##### 普通权限
+
+```shell
+qz@ubuntu:/home/linuxprobe$  ll
+total 16
+drwxr-xr-x  2 linuxprobe root       4096 10月 22  2025 ./
+drwxr-xr-x 11 root       root       4096 6月  28 23:00 ../
+-rw-------  1 linuxprobe linuxprobe  329 6月  28 23:22 .bash_history
+-rw-rw-r--  1 linuxprobe linuxprobe   36 10月 22  2025 readme.md
+```
+
+rwx  -  rwx  -  rwx
+
+421  -  421  -  421
+
+用户    用户组  其他人
+
+例如：
+
+```shell
+sudo chmod 666 test  # 表示给 用户&用户组&其他人读写权限
+sudo chmod u+rw,g+rw,o+x .bash_history  # user+rw, group+rw, other+execute
+```
+
+对于文件：
+
+r, w ,x 分别是可读，可写，可执行的权限
+
+对于目录：
+
+r, w, x 分别是：可以用 ls 显示; 协议创建/修改文件; 可以 cd 进入文件目录的权限
+
+
+
+##### 特殊权限位
 
 - SUID, SGID, SBIT - 特殊权限位(Special Bit)
 
@@ -1766,14 +2100,21 @@ FHS - 文件系统层次标准
 | /usr/local  | 用户自行安装的软件, 属于 /usr 目录                           |
 | /usr/sbin   | linux 系统开机时会用到的软件,命令,脚本                       |
 | /esr/share  | 帮助与说明文档,也可放置共享文件                              |
-| /var        | 存放经常变化的文件,如:日志文件                               |
+| /var        | 存放经常变化的文件,如:日志文件 /var/log,                     |
 | /lost+found | 当文件系统发生错误时,将一些丢失的文件片段存放在这里          |
 
 - udev 设备管理器
 
 udev 设备管理器会自动把硬件设备管理起来, 
 
-udev 设备管理器的服务会一直以守护进程 (/lib/systemd/systemd-udevd) 的形式存在来监听内核发出的信号来管理 `/dev`目录下的设备文件.Linux 系统中常见的硬件设备的文件名称如表所示:
+udev 设备管理器的服务会一直以守护进程 (/lib/systemd/systemd-udevd) 的形式存在来监听内核发出的信号来管理 `/dev`目录下的设备文件.
+
+```shell
+root        498  0.0  0.0  46704  5380 ?        Ss   7月03   0:02 /lib/systemd/systemd-udevd
+qz         2144  0.0  0.0  34608   280 ?        S    7月03   0:00 upstart-udev-bridge --daemon --user
+```
+
+Linux 系统中常见的硬件设备的文件名称如表所示:
 
 | 硬件设备                                                     | 文件名称                                          |
 | ------------------------------------------------------------ | ------------------------------------------------- |
@@ -1801,7 +2142,7 @@ brw-rw----  1 root disk      8,     6 10月 14  2025 sda6
 
 - 硬盘设备为什么最多有 4 个主分区:
 
-硬盘第一个删除(512 bytes)存储主引导记录(446 bytes) 和分区表信息.
+硬盘第一个扇区(512 bytes)存储主引导记录(446 bytes) 和分区表信息.
 
 每个分区表大小:16 bytes, 因此剩余空间: 512-446=66bytes, 最多存储 4 个主分区.
 
@@ -1835,15 +2176,29 @@ major minor  #blocks  name
 
 ```shell
 sudo blkid /dev/sdb
-qz@ubuntu:~/Desktop/Typora-linux-x64$  sudo blkid /dev/sdc
+sudo blkid /dev/sdc
 /dev/sdc: UUID="3b03fdfb-4527-447e-01c1-715946fb860f" UUID_SUB="67b5eec2-07f3-759b-0eaa-b29234afb140" LABEL="ubuntu:0" TYPE="linux_raid_member" # 虽然其他方法查不到挂载信息，但是这里可以看到是 linux raid member
 
 # fdisk
-qz@ubuntu:~/Desktop/Typora-linux-x64$  sudo fdisk -l /dev/sdc
+sudo fdisk -l /dev/sdc
 Disk /dev/sdc: 20 GiB, 21474836480 bytes, 41943040 sectors
 Units: sectors of 1 * 512 = 512 bytes
 Sector size (logical/physical): 512 bytes / 512 bytes
 I/O size (minimum/optimal): 512 bytes / 512 bytes
+```
+
+文件 `/etc/fstab` 文件中详细记录了 Ubuntu 中硬盘分区的情况
+
+```shell
+qz@ubuntu:/tmp$   df -h
+Filesystem      Size  Used Avail Use% Mounted on
+udev            3.9G     0  3.9G   0% /dev
+tmpfs           796M   60M  737M   8% /run
+/dev/sda1        32G   18G   13G  58% /
+tmpfs           3.9G   23M  3.9G   1% /dev/shm
+tmpfs           5.0M  4.0K  5.0M   1% /run/lock
+tmpfs           3.9G     0  3.9G   0% /sys/fs/cgroup
+tmpfs           796M   88K  796M   1% /run/user/1000
 ```
 
 
@@ -1854,23 +2209,40 @@ I/O size (minimum/optimal): 512 bytes / 512 bytes
 
 **挂载——当用户需要使用硬盘/分区中的数据时，需要先将其与一个已存在的目录建立关联，这个关联的动作就是挂载**
 
-- mount
+- mount - 挂载
 
 ```shell
 mount --help
 #  -a, --all               mount all filesystems mentioned in fstab， 自动检查 /etc/fstab 中有无疏漏被挂载的设备文件，如果有则自动进行挂载
 # -t, --types <list>      limit the set of filesystem types， 一般不需要使用 -t 参数来指定文件系统类型，linux 系统会自行判断
+# -o ro 只读模式挂载
+# -o rw 读写模式挂载
+# -r, --read-only         mount the filesystem read-only (same as -o ro)
+# -w, --rw, --read-write  mount the filesystem read-write (default)
+# -l, --show-labels       show also filesystem labels
+# -v, --verbose           say what is being done
+# -t, --types fstype The  argument  following  the  -t is used to indicate the filesystem type.  The filesystem types which are cur‐ rently supported depend on the running kernel.  See /proc/filesystems  and  /lib/modules/$(uname  -r)/kernel/fs for  a complete list of the filesystems.  The most common are ext2, ext3, ext4, xfs, btrfs, vfat, sysfs, proc, nfs and cifs.
 
-mount /dev/sdb2 /backup # 将 /dev/sdb2 挂载到 /backup 目录，将硬件设备与目录进行关联
-umount /dev/sdb2 # 取消挂载，意味着不再使用硬件资源
+mount /dev/sdb2 /backup  # 将 /dev/sdb2 挂载到 /backup 目录，将硬件设备与目录进行关联
+umount /dev/sdb2  # 取消挂载，意味着不再使用硬件资源
 
-mount -lhV # 查看所有的文件系统挂载信息
-mount -lhV | grep /dev/sdb # 查看硬盘 /dev/sdb 是否被挂载，如果已经挂载情况下可以尝试 umount /挂载目录取消挂载，再尝试能否使用
+mount -t vfat /dev/sdb1 /mnt/tmp  # 挂载 U 盘到 /mnt/tmp 目录
+
+
+mount -lv # 查看所有的文件系统挂载信息
+mount -lv | grep /dev/sdb # 查看硬盘 /dev/sdb 是否被挂载，如果已经挂载情况下可以尝试 umount /挂载目录取消挂载，再尝试能否使用
 ```
 
 - umount - 取消挂载
 
-TODO:
+```shell
+# -t, --types <list>      limit the set of filesystem types, 仅卸载选项中指定的文件系统
+# -v verbose
+```
+
+
+
+# TODO:
 
  为什么取消挂载后，挂载的目录仍然可以访问？？
 
@@ -1878,7 +2250,7 @@ TODO:
 umount /dev/sdb1
 ```
 
-- /etc/fstab - 如果想让硬件设备和目录永久的自动关联，就必须把挂在信息按照指定的格式写入到 /etc/fstab 中
+- /etc/fstab - 如果想让硬件设备和目录永久的自动关联，就必须把挂在信息按照指定的格式写入到 `/etc/fstab` 中
 
 "设备文件  挂载目录  格式类型  权限选项  是否备份  是否自检"
 
@@ -1939,15 +2311,15 @@ file /dev/sdb1
 #/dev/sdb1: block special (8/17)
 ```
 
-- partprobe - inform the OS of partition table changes
+- partprobe - inform the OS of partition table changes, 通知操作系统磁盘分区发生了修改
 
-如果 fdisks 命令创建后分区没有生效(没有 /dev/sdb1 文件)的情况下，可以使用这个命令两次。如果仍然不行，重启电脑
+如果 fdisk 命令创建后分区没有生效(没有 `/dev/sdb1` 文件)的情况下，可以使用这个命令两次。如果仍然不行，重启电脑
 
 ```shell
 partprobe
 ```
 
-- mkfd 格式化文件系统
+- mkfs - 格式化文件系统
 
 ```shell
 # 打印支持的文件系统类型
@@ -1967,6 +2339,8 @@ mount /dev/sdb1 /newFS # 挂载硬盘到 /newFS 目录
 ```shell
 df --help
 df -h # 查看挂载状态和硬盘使用量信息
+-T, --print-type      print file system type  # 打印文件系统类型
+-i, --inodes          list inode information instead of block usage  # 显示文件系统的 i 节点使用率, 如果 i 节点用完了, 即使磁盘还有空间，也无法继续创建文件
 
 # TODO:
 # 为什么本地测试后没有 /dev/sdb1 硬盘信息？ 但是挂载的文件目录是可以使用的
@@ -2037,6 +2411,7 @@ fdisk /dev/sdb
 - mkswap - 创建交换分区, 专用的格式化命令
 
 ```shell
+#虚拟机默认没有交换分区
 qz@ubuntu:/newFS$  free -m
               total        used        free      shared  buff/cache   available
 Mem:           7953        1409        5358          44        1185        6180
@@ -2057,6 +2432,43 @@ Swap:           17G          0B         17G
 #交换分区
 /dev/sdb2       swap            swap    defaults        0       0
 ```
+
+- swapon - 使配置的交换分区生效 `/sbin/swapon`
+
+```shell
+sudo swapon -a  # 使 /etc/fstab 中配置的交换分区生效
+swapon --show
+
+-a, --all                enable all swaps from /etc/fstab
+ -d, --discard[=<policy>] enable swap discards, if supported by device
+ -e, --ifexists           silently skip devices that do not exist
+ -f, --fixpgsz            reinitialize the swap space if necessary
+ -o, --options <list>     comma-separated list of swap options
+ -p, --priority <prio>    specify the priority of the swap device
+ -s, --summary            display summary about used swap devices (DEPRECATED)
+     --show[=<columns>]   display summary in definable table
+     --noheadings         don't print table heading (with --show)
+     --raw                use the raw output format (with --show)
+     --bytes              display swap size in bytes in --show output
+ -v, --verbose            verbose mode
+```
+
+注意：
+
+1.**swap 不是文件系统，swap 分区不被挂载到目录树**(如: /mnt 或 /swap)，而是由内核直接作为虚拟内存管理
+
+2.挂载点字段必须是 none 或 swap: 在 /etc/fstab 中， swap 条目的第二列（挂载点）通常填写 none 或 swap ，表示不关联任何目录路径。否则可能导致死机等异常
+
+`/etc/fstab`
+
+```shell
+# swap was on /dev/sda5 during installation
+UUID=62c2f20e-1c68-4244-92b4-2f57c30909c4 none            swap    sw              0       0
+```
+
+
+
+
 
 ###### 磁盘容量配额 
 
@@ -2092,7 +2504,7 @@ dd if=/dev/zero of=/boot/tom bs=5M count=1 # 超过软限制，但仍然能用
 dd if=/dev/zero of=/boot/tom bs=8M count=1 # 超过硬限制，报错，无法使用
 ```
 
-**TODO:**
+# TODO:
 
 - edquota - 用户编辑用户的 quota 配额限制
 
@@ -2112,9 +2524,9 @@ su - tom
 
 ###### 软/硬链接方式
 
-硬链接：可以将它理解为一个指向原始文件 inode 的指针，系统不为它分配单独的 inode 和文件。所以硬链接与原始文件实际上是同一个文件，只是名字不同。我们每添加一个硬链接，该节点的 inode 连接数就为 +1, 而且只有当 inode 的连接数为 0 时，该文件才会真正删除。换言之，即使删除原文件，链接文件仍然存在且可以正常访问。由于技术的局限性，硬链接不能跨分区对目录文件进行链接。
+硬链接：可以将它理解为一个指向原始文件 inode 的指针，系统不为它分配单独的 inode 和文件。所以硬链接与原始文件实际上是同一个文件，只是名字不同。我们每添加一个硬链接，该节点的 inode 连接数就为 +1, 而且只有文件当 inode 的链接数为 0 时，该文件才会真正删除。换言之，即使删除原文件，链接文件仍然存在且可以正常访问。由于技术的局限性，硬链接不能跨分区对目录文件进行链接。
 
-软链接(符号链接)：仅仅包含所链接文件的路径名，因此可以跨文件系统进行链接。原始文件删除后，链接文件也失效，与 windows 中的快捷方式类似。
+软链接(符号链接)：仅仅包含所链接文件的路径名，因此可以跨文件系统进行链接。原始文件删除后，链接文件也失效(无法访问)，与 windows 中的快捷方式类似。
 
 - ln - make links between files
 
@@ -2137,6 +2549,22 @@ drwxr-xr-x 24 root root 4096 10月 15 17:42 ../
 -rw-rw-r--  2 qz   qz     20 10月 16 08:01 hard_link.txt
 lrwxrwxrwx  1 qz   qz      7 10月 16 08:01 soft_link.txt -> raw.txt
 ```
+
+
+
+**文件的 i 节点**
+
+i 节点中不直接存放文件名和文件内容, 而是存放指向这些数据存储块的指针
+
+存放的内容包括:文件类型(- r s d l c 等)，权限模式(rwx rwx rwx)，所有者(UID, GID)信息, 文件大小， 时间戳（access, modify, change）
+
+atime: 最后访问时间
+
+mtime: 文件内容最后修改时间
+
+ctime: 文件状态最后修改时间，指权限或元数据改变
+
+
 
 
 
@@ -2822,6 +3250,18 @@ nmcli connection delete house
 
 
 
+- **解决 Ubuntu 开机后网卡(interface)没有启动导致无法上网的问题**
+
+```shell
+ifconfig # 没有 ens33 的 interface
+sudo ifup ens33  # 使能网卡
+ip addr # 可以查看到所有支持的网卡
+```
+
+
+
+
+
 ###### 绑定两块网卡
 
 TODO:
@@ -2856,7 +3296,7 @@ company  4b3d9878-197b-41bb-b337-f80381d3accb  802-3-ethernet  -
 
 
 
-###### 远程控制服务 — SSH
+###### 远程控制服务 — ssh
 
 Secure Shell
 
@@ -2880,7 +3320,7 @@ ssh(1) obtains configuration data from the following sources in the following
        3.   system-wide configuration file (/etc/ssh/ssh_config)
 ```
 
-- 关闭使用 root 登录 ssh 的权限，可以降低被黑客破解密码的几率
+- 关闭使用 root 登录 ssh 的权限，可以降低被黑客破解密码的几率,  `/etc/ssh/ssh_config`
 
 ```shell
 # vi /etc/ssh/sshd_config
@@ -2892,7 +3332,9 @@ systemctl restart sshd
 systemctl enable sshd # 开机自启动 sshd 服务
 ```
 
-**远程修改 sshd 配置文件后，重启 sshd 服务，远程的 ssh 绘画竟然不会关闭！！！**
+**远程修改 sshd 配置文件后，重启 sshd 服务，远程的 ssh 会话竟然不会关闭！！！**
+
+###### ssh 客户端
 
 - 口令验证登录
 
@@ -2909,6 +3351,40 @@ ssh-keygen # 生成密钥对
 ssh-copy-id 192.168.10.10 # 将生成的密钥传送到远程主机
 ssh 192.168.10.10 # 登录
 ```
+
+- **windows ssh 客户端 - Putty** 
+
+问题1：链接同一个 AP，主机 A 上的虚拟机 C (网络使用桥接模式) ping 不同另一台主机B，互相ping 不通;
+
+**Windows 主机和虚拟机主机在同一网段，但是 ssh 客户端无法登陆，也 ping 不通——防火墙原因，关闭 windows 防火墙后功能正常。**
+
+问题2：关闭 windows 防火墙后, C 可以 ping 通 B，但是 B ping 不通 C
+
+虚拟机 C (192.168.10.10)的 IP 和主机 IP 不在同一网段（主机 A (192.168.1.5)和 主机 B (192.168.1.8)在同一网段），修改虚拟机 C 的 IP 后可以 ping 通，并可以使用 ssh 客户端：
+
+临时设置：
+
+```shell
+sudo ifconfig ens33 192.168.1.9 netmask 255.255.255.0 # 原来 ip 是:192.168.10.10, netmask:255.255.255.0
+```
+
+永久设置：
+
+`/etc/network/interfaces`
+
+```shell
+iface ens33 inet static
+    address 192.168.1.11
+    netmask 255.255.255.0
+    gateway 192.168.1.1
+    dns-nameservers 8.8.8.8 8.8.4.4
+```
+
+重启网络服务：
+
+`sudo systemctl restart networking`
+
+
 
 - scp - secure copy(remote file copy program)
 
@@ -3550,6 +4026,9 @@ root@ubuntu:~#  systemctl status vsftpd # 安装完成后查看服务状态
  Main PID: 4176 (vsftpd)
    CGroup: /system.slice/vsftpd.service
            └─4176 /usr/sbin/vsftpd /etc/vsftpd.conf
+           
+# 和可以使用 /etc/init.d 重启服务,两种方式有什么区别?
+suso /etc/init.d/vsftpd restart
 ```
 
 FTP 服务守护进程名称  vsftpd(Very Secure File Transfer Protocol Daemon)
@@ -3746,6 +4225,8 @@ service tftp
 
 TFTP 的根目录为：`/var/lib/tftpboot`，
 
+###### FTP 客户端
+
 客户端登陆：
 
 ```shell
@@ -3770,9 +4251,19 @@ Error code 1: File not found
 quit # 退出
 ```
 
+- windows 客户端
+
+FileZilla - 免费的 FTP 客户端软件
+
+https://filezilla-project.org/
+
 
 
 #### ch12 使用 Samba 或 NFS 实现文件共享
+
+Linux & Windows 平台都可以直接进行文件共享。
+
+
 
 - SMB 协议（Server Message Block）
 
@@ -3782,7 +4273,7 @@ quit # 退出
 
 ###### Samba 
 
-**TODO:**
+# TODO:
 
 1. samba 服务安装后 smbd 守护进程正常运行，但是没有 smb 用户导致 `pdbedit` 命令运行异常。
 2. 手动创建 smb 用户并且通过 smbpasswd 添加到 smb 用户数据库后，pdbedit 命令仍然无法使用;
@@ -3967,6 +4458,8 @@ root@ubuntu:/#   systemctl status nfs-kernel-server
 
 两台 Linux 主机一台 NFS 客户端，一台 NFS 服务端
 
+NFS 服务端配置，修改 `/etc/exports` 文件
+
 ```shell
 # step1: 设置客户端以及服务端的 ip 地址：
 # 这里设置为同一网段
@@ -3975,7 +4468,7 @@ root@ubuntu:/#   systemctl status nfs-kernel-server
 mkdir /nfsfile
 chmod -R 777 /nfsfile
 
-# step3:配置 NFS 服务程序为 /etc/exports
+# step3:配置 NFS 服务程序为 `/etc/exports`
 # 允许 192.168.10.0/24 网段的所有主机访问，
 /nfsfile 192.168.10.*(rw,sync,root_squash)
 
@@ -3984,6 +4477,9 @@ chmod -R 777 /nfsfile
 systemctl restart rpcbind
 systemctl enable rpcbind
 systemctl restart nfs-server # 
+
+#或
+sudo /etc/init.d/nfs-kernel-server restart
 ```
 
 - exportfs - exportfs - maintain table of exported NFS file systems
@@ -5236,9 +5732,13 @@ mariadb-client-10.0       mariadb-common            mariadb-plugin-mroonga    ma
 
 
 
-- MySQL 存在的情况下安装 MariaDB， 
+# TODO:
 
-  TODO: 数据被迁移了，
+
+
+- MySQL 存在的情况下安装 MariaDB，  
+
+  数据被迁移了，数据存储位置：`/var/lib/mysql-5.7`
 
   MySQL 数据库中的内容如何迁移到 MaridDB
 
@@ -5247,10 +5747,8 @@ mariadb-client-10.0       mariadb-common            mariadb-plugin-mroonga    ma
   ```shell
   mysqldump -u [username] -p[password] [database_name] > database_backup.sql
   # MySQL 已经被卸载了，如果要恢复可能要卸载 MaridDB 再安装 MySQL 然后恢复?
-  ```
-
   
-
+  # MySQL 存在的情况下安装 MariaDB 提示:
   ​        │                                                                                                                                                                                │ 
   ​        │ The old data directory will be saved at new location.                                                                                                                          │ 
   ​        │                                                                                                                                                                                │ 
@@ -5259,6 +5757,10 @@ mariadb-client-10.0       mariadb-common            mariadb-plugin-mroonga    ma
   ​        │ Therefore the previous data directory will be renamed to **/var/lib/mysql-*** and a new data directory will be initialized a**t /var/lib/mysql**.                                      │ 
   ​        │                                                                                                                                                                                │ 
   ​        │ Please manually export/import your data (e.g. with mysqldump) if needed.  
+  ```
+  
+  
+  
 
 
 
